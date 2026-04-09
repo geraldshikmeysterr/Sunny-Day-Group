@@ -1,0 +1,91 @@
+"use client";
+import { useState, useEffect, useCallback } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { formatDateTime, ORDER_STATUS_LABELS, ORDER_STATUS_COLORS } from "@/lib/utils";
+import { useAdmin } from "@/components/layout/AdminContext";
+import { RefreshCw, Search } from "lucide-react";
+import { toast } from "sonner";
+import { CustomSelect } from "@/components/CustomSelect";
+import type { OrderStatus } from "@/lib/utils";
+
+const PAGE_SIZE = 25;
+
+export default function CompletedOrdersPage() {
+  const { isAdmin, cityId } = useAdmin() as any;
+  const supabase = createClient();
+  const [orders, setOrders] = useState<any[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [cityFilter, setCityFilter] = useState("all");
+  const [cities, setCities] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (isAdmin) createClient().from("cities").select("id,name").order("name").then(({data})=>setCities(data??[]));
+  }, [isAdmin]);
+
+  const fetchOrders = useCallback(async () => {
+    setLoading(true);
+    try {
+      let q = supabase.from("orders")
+        .select("id,status,total_amount,delivery_fee,created_at,payment_status,profiles(phone,first_name),order_items(item_name,quantity),cities(name)", { count: "exact" })
+        .in("status", ["completed","cancelled"])
+        .range(page*PAGE_SIZE,(page+1)*PAGE_SIZE-1)
+        .order("created_at",{ascending:false});
+      if (!isAdmin && cityId) q = q.eq("city_id", cityId);
+      else if (isAdmin && cityFilter !== "all") q = q.eq("city_id", cityFilter);
+      if (statusFilter !== "all") q = q.eq("status", statusFilter);
+      const { data, count } = await q;
+      setOrders(data??[]); setTotal(count??0);
+    } catch { toast.error("Ошибка загрузки"); }
+    finally { setLoading(false); }
+  }, [page, statusFilter, cityFilter, isAdmin, cityId]);
+
+  useEffect(() => { fetchOrders(); }, [fetchOrders]);
+
+  const filtered = orders.filter(o => !search || o.profiles?.phone?.includes(search) || o.id.includes(search));
+  const totalPages = Math.ceil(total/PAGE_SIZE);
+  const cityOptions = [{ value: "all", label: "Все города" }, ...cities.map(c=>({value:c.id,label:c.name}))];
+  const statusOptions = [{ value:"all", label:"Все статусы" }, {value:"completed",label:"Выполнен"}, {value:"cancelled",label:"Отменён"}];
+
+  return (
+    <div className="p-6 max-w-7xl mx-auto space-y-5">
+      <div className="flex items-center justify-between">
+        <div><h1 className="text-3xl font-bold text-neutral-900">Выполненные заказы</h1><p className="text-sm text-neutral-500 mt-0.5">{total} заказов завершено</p></div>
+        <button onClick={fetchOrders} disabled={loading} className="btn-secondary btn-sm"><RefreshCw size={14} className={loading?"animate-spin":""}/> Обновить</button>
+      </div>
+      <div className="card p-4 flex flex-wrap gap-3 sticky top-4 z-20 bg-white shadow-card">
+        <div className="relative flex-1 min-w-52"><Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Поиск..." className="input pl-8 text-sm" autoComplete="off"/></div>
+        {isAdmin && <CustomSelect value={cityFilter} onChange={setCityFilter} options={cityOptions} className="w-44"/>}
+        <CustomSelect value={statusFilter} onChange={setStatusFilter} options={statusOptions} className="w-44"/>
+      </div>
+      <div className="card overflow-hidden">
+        <div className="table-wrapper rounded-none border-0">
+          <table className="table">
+            <thead><tr><th>Заказ</th><th>Клиент</th>{isAdmin&&<th>Город</th>}<th>Состав</th><th>Сумма</th><th>Статус</th><th>Оплата</th><th>Дата</th></tr></thead>
+            <tbody>
+              {loading&&Array.from({length:6}).map((_,i)=><tr key={i}>{Array.from({length:isAdmin?8:7}).map((_,j)=><td key={j}><div className="skeleton h-4"/></td>)}</tr>)}
+              {!loading&&filtered.map(order=>{
+                const c=ORDER_STATUS_COLORS[order.status as OrderStatus];
+                return(<tr key={order.id}>
+                  <td className="font-mono text-xs font-bold">#{order.id.slice(0,8).toUpperCase()}</td>
+                  <td><p className="font-medium text-sm">{order.profiles?.phone??"—"}</p>{order.profiles?.first_name&&<p className="text-xs text-neutral-400">{order.profiles.first_name}</p>}</td>
+                  {isAdmin&&<td className="text-sm text-neutral-500">{order.cities?.name??"—"}</td>}
+                  <td className="max-w-xs"><span className="text-xs text-neutral-500 line-clamp-2">{order.order_items?.map((i:any)=>`${i.item_name} ×${i.quantity}`).join(", ")}</span></td>
+                  <td className="num font-semibold whitespace-nowrap">{((order.total_amount??0)/100).toLocaleString("ru-RU")} ₽</td>
+                  <td><span className={`badge ${c.bg} ${c.text}`}><span className={`w-1.5 h-1.5 rounded-full ${c.dot}`}/>{ORDER_STATUS_LABELS[order.status as OrderStatus]}</span></td>
+                  <td><span className={`badge text-xs ${order.payment_status==="paid"?"bg-success-50 text-success-700":"bg-neutral-100 text-neutral-500"}`}>{order.payment_status==="paid"?"Оплачен":order.payment_status==="refunded"?"Возврат":"—"}</span></td>
+                  <td className="text-xs text-neutral-400 num whitespace-nowrap">{formatDateTime(order.created_at)}</td>
+                </tr>);
+              })}
+              {!loading&&!filtered.length&&<tr><td colSpan={isAdmin?8:7} className="py-16 text-center text-neutral-400">Нет завершённых заказов</td></tr>}
+            </tbody>
+          </table>
+        </div>
+        {totalPages>1&&<div className="flex items-center justify-between px-5 py-3 border-t border-neutral-100"><p className="text-sm text-neutral-500 num">{page*PAGE_SIZE+1}–{Math.min((page+1)*PAGE_SIZE,total)} из {total}</p><div className="flex gap-1"><button onClick={()=>setPage(p=>Math.max(0,p-1))} disabled={page===0} className="btn-secondary btn-sm">Назад</button><button onClick={()=>setPage(p=>Math.min(totalPages-1,p+1))} disabled={page>=totalPages-1} className="btn-secondary btn-sm">Далее</button></div></div>}
+      </div>
+    </div>
+  );
+}

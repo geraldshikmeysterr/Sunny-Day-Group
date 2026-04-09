@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "defaultMode": "dontAsk",
+    "allow": [
+      "Bash(git:*)"
+    ],
+    "deny": [
+      "Bash(rm:*)",
+      "Bash(rmdir:*)",
+      "Bash(del:*)",
+      "Bash(rd:*)",
+      "Bash(git rm:*)",
+      "Bash(git clean:*)"
+    ]
+  }
+}

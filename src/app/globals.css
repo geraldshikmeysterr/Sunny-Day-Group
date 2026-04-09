@@ -1,0 +1,63 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Yanone+Kaffeesatz:wght@400;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-inter:  "Inter", system-ui, sans-serif;
+  --font-yanone: "Yanone Kaffeesatz", sans-serif;
+  --sidebar-width: 240px;
+}
+
+@layer base {
+  *, *::before, *::after { box-sizing: border-box; }
+  html { -webkit-font-smoothing: antialiased; }
+  body { @apply bg-neutral-100 text-neutral-900 font-sans text-sm; min-height: 100vh; }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { @apply bg-neutral-300 rounded-full; }
+  ::selection { background: rgba(245,115,0,0.2); }
+  h1, h2, h3 { font-family: var(--font-yanone); letter-spacing: 0.01em; }
+}
+
+@layer components {
+  .card { @apply bg-white rounded-xl shadow-card border border-neutral-200/60; }
+
+  .btn { @apply inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-all duration-150 select-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed; }
+  .btn-primary   { @apply btn bg-brand-500 text-white hover:bg-brand-600 active:bg-brand-700 shadow-sm; }
+  .btn-secondary { @apply btn bg-white text-neutral-700 border border-neutral-300 hover:bg-neutral-50 hover:border-neutral-400; }
+  .btn-ghost     { @apply btn text-neutral-600 hover:bg-neutral-100 active:bg-neutral-200; }
+  .btn-danger    { @apply btn bg-danger-500 text-white hover:bg-danger-600; }
+  .btn-sm  { @apply text-xs px-3 py-1.5 h-8; }
+  .btn-md  { @apply text-sm px-4 py-2 h-9; }
+  .btn-lg  { @apply text-base px-5 py-2.5 h-10; }
+
+  .input { @apply w-full rounded-lg border border-neutral-300 bg-white text-sm text-neutral-900 placeholder:text-neutral-400 px-3 py-2 h-9 outline-none transition-all hover:border-neutral-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 disabled:bg-neutral-50 disabled:cursor-not-allowed; }
+  .input-error { @apply border-danger-500 focus:border-danger-500 focus:ring-danger-500/20; }
+  .textarea { @apply input h-auto py-2 resize-none; }
+  .select   { @apply input appearance-none cursor-pointer; }
+  .label    { @apply block text-sm font-medium text-neutral-700 mb-1; }
+  .error-msg { @apply text-xs text-danger-600 mt-1; }
+
+  .table-wrapper { @apply overflow-x-auto rounded-xl border border-neutral-200/60; }
+  .table    { @apply w-full text-sm text-left border-collapse; }
+  .table th { @apply bg-neutral-50 text-neutral-500 font-medium uppercase tracking-wide text-xs px-4 py-3 border-b border-neutral-200 whitespace-nowrap; }
+  .table td { @apply px-4 py-3 border-b border-neutral-100 text-neutral-800 align-middle; }
+  .table tr:last-child td { @apply border-b-0; }
+  .table tr:hover td { @apply bg-neutral-50/60; }
+
+  .badge    { @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium; }
+  .skeleton { @apply rounded-md bg-neutral-200 animate-pulse; }
+  .num      { font-variant-numeric: tabular-nums; }
+}
+
+/* Убираем стрелки у number inputs */
+input[type=number]::-webkit-outer-spin-button,
+input[type=number]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type=number] {
+  -moz-appearance: textfield;
+}
