@@ -25,12 +25,13 @@ type MenuItem = {
   proteins: number | null; fats: number | null; carbs: number | null;
   image_url: string | null; is_global_active: boolean; sort_order: number;
   active_from: string | null; active_until: string | null;
+  box_quantity: number | null;
 };
 
 const EMPTY_FORM = {
   name: "", description: "", weight_grams: "",
   calories: "", proteins: "", fats: "", carbs: "", image_url: "", is_global_active: true,
-  active_from: "10:00", active_until: "20:00",
+  active_from: "10:00", active_until: "20:00", box_quantity: "",
 };
 
 const getTypeName = (name: string) =>
@@ -328,6 +329,7 @@ export default function MenuEditorPage() {
       carbs: String(item.carbs ?? ""), image_url: item.image_url ?? "",
       is_global_active: item.is_global_active,
       active_from: item.active_from ?? "", active_until: item.active_until ?? "",
+      box_quantity: String(item.box_quantity ?? ""),
     });
     setPhotoPreview(item.image_url); setPhotoFile(null);
     setModal({ open: true, item, catId: item.category_id });
@@ -360,6 +362,7 @@ export default function MenuEditorPage() {
       category_id: modal.catId,
       active_from: form.active_from || null,
       active_until: form.active_until || null,
+      box_quantity: form.box_quantity ? parseInt(form.box_quantity) : null,
     };
     if (modal.item) {
       await supabase.from("menu_items").update(payload).eq("id", modal.item.id);
@@ -540,7 +543,16 @@ export default function MenuEditorPage() {
                   ))}
                 </div>
               </div>
-              <div><label className="label">Вес (г)</label><input type="number" placeholder="Вес блюда" value={form.weight_grams} onChange={e => setForm(p => ({ ...p, weight_grams: e.target.value }))} className="input" /></div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label">Вес (г)</label>
+                  <input type="number" placeholder="Вес блюда" value={form.weight_grams} onChange={e => setForm(p => ({ ...p, weight_grams: e.target.value }))} className="input" />
+                </div>
+                <div>
+                  <label className="label">Шт. в коробке</label>
+                  <input type="number" placeholder="Пусто — нельзя" value={form.box_quantity} onChange={e => setForm(p => ({ ...p, box_quantity: e.target.value }))} className="input" min={1} />
+                </div>
+              </div>
               <div className="border-t border-neutral-200 pt-3">
                 <p className="label mb-1">Расписание активности</p>
                 <p className="text-xs text-neutral-400 mb-3">Блюдо будет автоматически включаться и выключаться по времени. Оставьте пустым — всегда активно.</p>
