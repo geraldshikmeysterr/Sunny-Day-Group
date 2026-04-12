@@ -549,8 +549,8 @@ export default function MenuEditorPage() {
                   <input type="number" placeholder="Вес блюда" value={form.weight_grams} onChange={e => setForm(p => ({ ...p, weight_grams: e.target.value }))} className="input" />
                 </div>
                 <div>
-                  <label className="label">Шт. в коробке</label>
-                  <input type="number" placeholder="Пусто — нельзя" value={form.box_quantity} onChange={e => setForm(p => ({ ...p, box_quantity: e.target.value }))} className="input" min={1} />
+                  <label className="label">Количество в коробке</label>
+                  <input type="number" placeholder="Укажите шт. для коробки" value={form.box_quantity} onChange={e => setForm(p => ({ ...p, box_quantity: e.target.value }))} className="input" min={1} />
                 </div>
               </div>
               <div className="border-t border-neutral-200 pt-3">
