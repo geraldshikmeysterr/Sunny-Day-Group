@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   ShoppingBag, CheckCircle2, UtensilsCrossed, Building2,
-  MapPin, Ticket, Users, UserCog, LogOut, ChevronRight, Calendar,
+  MapPin, Ticket, Users, UserCog, LogOut, ChevronRight, Calendar, LayoutList,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -18,6 +18,7 @@ const NAV = [
     { href: "/menu-editor",       label: "Редактор меню",      icon: UtensilsCrossed,roles: ["superadmin"] },
     { href: "/menu/availability", label: "По городам",         icon: Building2,      roles: ["superadmin","operator"] },
     { href: "/menu/schedule",     label: "По дням",           icon: Calendar,       roles: ["superadmin"] },
+    { href: "/carousel",          label: "Карусель",           icon: LayoutList,     roles: ["superadmin"] },
   ]},
   { title: "Управление", items: [
     { href: "/cities",      label: "Города",     icon: Building2, roles: ["superadmin"] },
