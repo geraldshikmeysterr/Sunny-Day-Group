@@ -66,7 +66,6 @@ export default function UsersPage() {
         <table className="table">
           <thead>
             <tr>
-              <th>Имя</th>
               <th>Email</th>
               <th>Роль</th>
               <th>Город</th>
@@ -76,15 +75,14 @@ export default function UsersPage() {
           </thead>
           <tbody>
             {loading && Array.from({ length: 4 }).map((_, i) => (
-              <tr key={i}>{Array.from({ length: 6 }).map((_, j) => <td key={j}><div className="skeleton h-4" /></td>)}</tr>
+              <tr key={i}>{Array.from({ length: 5 }).map((_, j) => <td key={j}><div className="skeleton h-4" /></td>)}</tr>
             ))}
             {!loading && filtered.map(u => (
               <tr key={u.id}>
                 <td>
-                  <p className="font-medium">{u.full_name ?? "—"}</p>
+                  <p className="font-medium text-sm text-neutral-800">{u.email ?? "—"}</p>
                   <p className="text-xs text-neutral-400 font-mono">{u.id.slice(0, 8)}</p>
                 </td>
-                <td className="text-sm text-neutral-600">{u.email ?? "—"}</td>
                 <td>
                   <span className={cn("badge text-xs", u.role === "admin" ? "bg-brand-100 text-brand-700" : "bg-sun-100 text-brand-700")}>
                     {u.role === "admin" ? "Администратор" : "Оператор"}
@@ -100,7 +98,7 @@ export default function UsersPage() {
               </tr>
             ))}
             {!loading && !filtered.length && (
-              <tr><td colSpan={6} className="py-16 text-center text-neutral-400">Пользователи не найдены</td></tr>
+              <tr><td colSpan={5} className="py-16 text-center text-neutral-400">Пользователи не найдены</td></tr>
             )}
           </tbody>
         </table>

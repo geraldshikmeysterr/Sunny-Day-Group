@@ -194,11 +194,11 @@ export default function AvailabilityPage() {
       <div className="card p-4 flex flex-wrap gap-4 text-sm">
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 rounded bg-success-50 border border-success-200 flex items-center justify-center"><Check size={12} className="text-success-600" /></div>
-          <span className="text-neutral-600">Доступно</span>
+          <span className="text-neutral-600">Цена назначена</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 rounded bg-brand-50 border border-brand-200 flex items-center justify-center"><Check size={12} className="text-brand-600" /></div>
-          <span className="text-neutral-600">Своя цена</span>
+          <span className="text-neutral-600">Активно (без цены)</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 rounded bg-neutral-100 border border-neutral-300 flex items-center justify-center"><X size={12} className="text-neutral-400" /></div>
@@ -299,13 +299,13 @@ export default function AvailabilityPage() {
                                     "w-7 h-7 rounded-lg border transition-all flex items-center justify-center",
                                     isSaving && "opacity-50 cursor-wait",
                                     cell && isAvail
-                                      ? (hasPrice ? "bg-brand-50 border-brand-200 hover:bg-brand-100" : "bg-success-50 border-success-200 hover:bg-success-100")
+                                      ? (hasPrice ? "bg-success-50 border-success-200 hover:bg-success-100" : "bg-brand-50 border-brand-200 hover:bg-brand-100")
                                       : "bg-neutral-100 border-neutral-300 hover:bg-neutral-200"
                                   )}>
                                   {isSaving
                                     ? <Loader2 size={12} className="animate-spin text-neutral-400" />
                                     : isAvail
-                                    ? <Check size={12} className={hasPrice ? "text-brand-500" : "text-success-500"} />
+                                    ? <Check size={12} className={hasPrice ? "text-success-500" : "text-brand-500"} />
                                     : <X size={12} className="text-neutral-400" />}
                                 </button>
                                 {/* Цена */}

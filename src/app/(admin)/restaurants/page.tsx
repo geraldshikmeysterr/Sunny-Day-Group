@@ -59,7 +59,7 @@ export default function RestaurantsPage() {
     <div className="p-6 max-w-6xl mx-auto space-y-5">
       <div className="flex items-center justify-between">
         <div><h1 className="text-3xl font-bold text-neutral-900">Рестораны</h1><p className="text-sm text-neutral-500 mt-0.5">Точки сети</p></div>
-        <button onClick={openAdd} className="btn-primary btn-md"><Plus size={16}/> Добавить</button>
+        {isAdmin && <button onClick={openAdd} className="btn-primary btn-md"><Plus size={16}/> Добавить</button>}
       </div>
       <div className="card p-4 flex flex-wrap gap-3 items-center sticky top-4 z-20 bg-white shadow-card">
         <div className="relative flex-1 min-w-52"><Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Поиск по названию или адресу..." className="input pl-8 text-sm" autoComplete="off"/></div>
@@ -78,7 +78,7 @@ export default function RestaurantsPage() {
                 <td className="text-sm text-neutral-500">{r.phone??"—"}</td>
                 <td className="text-sm text-neutral-500 whitespace-nowrap">{r.working_hours??"—"}</td>
                 <td><span className={cn("badge text-xs",r.is_active?"bg-success-50 text-success-700":"bg-neutral-100 text-neutral-500")}>{r.is_active?"Открыт":"Закрыт"}</span></td>
-                <td><button onClick={()=>openEdit(r)} className="btn-ghost btn-sm text-brand-500"><Edit2 size={14}/></button></td>
+                {isAdmin && <td><button onClick={()=>openEdit(r)} className="btn-ghost btn-sm text-brand-500"><Edit2 size={14}/></button></td>}
               </tr>
             ))}
             {!loading&&!filtered.length&&<tr><td colSpan={isAdmin?7:6} className="py-16 text-center text-neutral-400">Нет ресторанов</td></tr>}

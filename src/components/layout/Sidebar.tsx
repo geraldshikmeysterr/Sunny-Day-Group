@@ -22,7 +22,7 @@ const NAV = [
   { title: "Управление", items: [
     { href: "/cities",      label: "Города",     icon: Building2, roles: ["superadmin"] },
     { href: "/restaurants", label: "Рестораны",  icon: MapPin,    roles: ["superadmin","operator"] },
-    { href: "/promos",      label: "Промокоды",  icon: Ticket,    roles: ["superadmin","operator"] },
+    { href: "/promos",      label: "Промокоды",  icon: Ticket,    roles: ["superadmin"] },
     { href: "/clients",     label: "Гости",      icon: Users,     roles: ["superadmin","operator"] },
   ]},
   { title: "Система", items: [
