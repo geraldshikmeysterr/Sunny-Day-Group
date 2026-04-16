@@ -331,7 +331,7 @@ export default function AvailabilityPage() {
                                       onClick={() => { setEditing({ itemId: item.id, cityId: city.id }); setPriceInput(hasPrice ? String(cell.price) : ""); }}
                                       className="text-xs text-neutral-400 hover:text-brand-500 flex items-center gap-0.5">
                                       {hasPrice
-                                        ? <span className="text-brand-500 font-medium num">{cell.price} ₽</span>
+                                        ? <span className="text-success-600 font-medium num">{cell.price} ₽</span>
                                         : <span>+ цена</span>}
                                       <Edit3 size={9} />
                                     </button>
