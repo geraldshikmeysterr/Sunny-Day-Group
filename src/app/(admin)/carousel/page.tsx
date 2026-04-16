@@ -10,19 +10,58 @@ import {
   useSortable, verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Plus, Edit2, Trash2, X, Loader2, ImageIcon, Eye, EyeOff, GripVertical } from "lucide-react";
+import { Plus, Edit2, Trash2, X, Loader2, ImageIcon, Eye, EyeOff, GripVertical, Link, Smartphone } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { CustomSelect } from "@/components/CustomSelect";
 
 type Card = {
   id: string;
   title: string;
   image_url: string | null;
+  action_url: string | null;
   sort_order: number;
   is_active: boolean;
 };
 
-const EMPTY = { title: "", image_url: "", is_active: true };
+type ActionType = "none" | "url" | "app";
+type AppTarget = "menu" | "category" | "factory" | "promo" | "item";
+
+const APP_TARGETS: { value: AppTarget; label: string }[] = [
+  { value: "menu",     label: "Меню (главная)" },
+  { value: "category", label: "Категория" },
+  { value: "factory",  label: "Завод" },
+  { value: "promo",    label: "Промокод" },
+  { value: "item",     label: "Блюдо" },
+];
+
+// Парсим сохранённый action_url обратно в UI-состояние
+function parseActionUrl(url: string | null): { type: ActionType; appTarget: AppTarget; categoryId: string; itemId: string; promoCode: string; externalUrl: string } {
+  const base = { appTarget: "menu" as AppTarget, categoryId: "", itemId: "", promoCode: "", externalUrl: "" };
+  if (!url) return { ...base, type: "none" };
+  if (url.startsWith("http://") || url.startsWith("https://")) return { ...base, type: "url", externalUrl: url };
+  if (url === "app://menu") return { ...base, type: "app", appTarget: "menu" };
+  if (url === "app://factory") return { ...base, type: "app", appTarget: "factory" };
+  const catMatch = url.match(/^app:\/\/menu\?category=(.+)$/);
+  if (catMatch) return { ...base, type: "app", appTarget: "category", categoryId: catMatch[1] };
+  const itemMatch = url.match(/^app:\/\/menu\?item=(.+)$/);
+  if (itemMatch) return { ...base, type: "app", appTarget: "item", itemId: itemMatch[1] };
+  const promoMatch = url.match(/^app:\/\/promo\?code=(.+)$/);
+  if (promoMatch) return { ...base, type: "app", appTarget: "promo", promoCode: promoMatch[1] };
+  return { ...base, type: "url", externalUrl: url };
+}
+
+// Собираем action_url из UI-состояния
+function buildActionUrl(type: ActionType, appTarget: AppTarget, categoryId: string, itemId: string, promoCode: string, externalUrl: string): string | null {
+  if (type === "none") return null;
+  if (type === "url") return externalUrl || null;
+  if (appTarget === "menu") return "app://menu";
+  if (appTarget === "factory") return "app://factory";
+  if (appTarget === "category") return categoryId ? `app://menu?category=${categoryId}` : null;
+  if (appTarget === "item") return itemId ? `app://menu?item=${itemId}` : null;
+  if (appTarget === "promo") return promoCode ? `app://promo?code=${promoCode}` : null;
+  return null;
+}
 
 // ── Sortable row ──────────────────────────────────────────────────────────────
 function SortableCard({ card, onEdit, onDelete, onToggle }: {
@@ -34,6 +73,17 @@ function SortableCard({ card, onEdit, onDelete, onToggle }: {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: card.id });
 
+  const actionLabel = (() => {
+    if (!card.action_url) return null;
+    if (card.action_url.startsWith("http")) return card.action_url;
+    if (card.action_url === "app://menu") return "Меню";
+    if (card.action_url === "app://factory") return "Завод";
+    if (card.action_url.includes("category=")) return "Категория";
+    if (card.action_url.includes("item=")) return "Блюдо";
+    if (card.action_url.includes("promo?code=")) return "Промокод: " + card.action_url.split("code=")[1];
+    return card.action_url;
+  })();
+
   return (
     <div
       ref={setNodeRef}
@@ -44,23 +94,23 @@ function SortableCard({ card, onEdit, onDelete, onToggle }: {
         !card.is_active && "opacity-50"
       )}
     >
-      <button
-        {...listeners} {...attributes}
-        className="cursor-grab active:cursor-grabbing text-neutral-300 hover:text-neutral-400 shrink-0 touch-none"
-      >
+      <button {...listeners} {...attributes} className="cursor-grab active:cursor-grabbing text-neutral-300 hover:text-neutral-400 shrink-0 touch-none">
         <GripVertical size={16} />
       </button>
 
-      {/* Фото крупное */}
       {card.image_url
         ? <img src={card.image_url} alt="" className="w-20 h-20 rounded-xl object-cover shrink-0" />
-        : <div className="w-20 h-20 rounded-xl bg-neutral-100 flex items-center justify-center shrink-0">
-            <ImageIcon size={20} className="text-neutral-400" />
-          </div>
+        : <div className="w-20 h-20 rounded-xl bg-neutral-100 flex items-center justify-center shrink-0"><ImageIcon size={20} className="text-neutral-400" /></div>
       }
 
       <div className="flex-1 min-w-0">
         <p className="font-semibold text-neutral-900">{card.title}</p>
+        {actionLabel && (
+          <p className="text-xs text-neutral-400 mt-0.5 truncate max-w-xs">{actionLabel}</p>
+        )}
+        {!card.action_url && (
+          <p className="text-xs text-neutral-300 mt-0.5">Кнопка «Подробнее» отключена</p>
+        )}
       </div>
 
       <span className={cn("badge text-xs shrink-0", card.is_active ? "bg-success-50 text-success-700" : "bg-neutral-100 text-neutral-500")}>
@@ -68,7 +118,7 @@ function SortableCard({ card, onEdit, onDelete, onToggle }: {
       </span>
 
       <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-        <button onClick={() => onToggle(card)} className={cn("btn-ghost btn-sm", card.is_active ? "text-success-500" : "text-neutral-300")} title={card.is_active ? "Скрыть" : "Показать"}>
+        <button onClick={() => onToggle(card)} className={cn("btn-ghost btn-sm", card.is_active ? "text-success-500" : "text-neutral-300")}>
           {card.is_active ? <Eye size={15} /> : <EyeOff size={15} />}
         </button>
         <button onClick={() => onEdit(card)} className="btn-ghost btn-sm text-brand-500"><Edit2 size={15} /></button>
@@ -82,12 +132,26 @@ function SortableCard({ card, onEdit, onDelete, onToggle }: {
 export default function CarouselPage() {
   const supabase = createClient();
   const [cards, setCards] = useState<Card[]>([]);
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+  const [menuItems, setMenuItems] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState<{ open: boolean; editing: Card | null }>({ open: false, editing: null });
-  const [form, setForm] = useState(EMPTY);
-  const [saving, setSaving] = useState(false);
+
+  // Основная форма
+  const [title, setTitle] = useState("");
+  const [isActive, setIsActive] = useState(true);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+
+  // Action URL форма
+  const [actionType, setActionType] = useState<ActionType>("none");
+  const [appTarget, setAppTarget] = useState<AppTarget>("menu");
+  const [categoryId, setCategoryId] = useState("");
+  const [itemId, setItemId] = useState("");
+  const [promoCode, setPromoCode] = useState("");
+  const [externalUrl, setExternalUrl] = useState("");
+
+  const [saving, setSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const sensors = useSensors(
@@ -102,7 +166,13 @@ export default function CarouselPage() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { fetchCards(); }, [fetchCards]);
+  useEffect(() => {
+    fetchCards();
+    supabase.from("categories").select("id,name").eq("is_active", true).order("name")
+      .then(({ data }) => setCategories(data ?? []));
+    supabase.from("menu_items").select("id,name").eq("is_global_active", true).order("name")
+      .then(({ data }) => setMenuItems(data ?? []));
+  }, [fetchCards]);
 
   async function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
@@ -111,43 +181,36 @@ export default function CarouselPage() {
     const newIndex = cards.findIndex(c => c.id === over.id);
     const reordered = arrayMove(cards, oldIndex, newIndex);
     setCards(reordered);
-    // Записываем новый порядок в БД
-    await Promise.all(
-      reordered.map((c, i) => supabase.from("carousel_cards").update({ sort_order: i }).eq("id", c.id))
-    );
+    await Promise.all(reordered.map((c, i) => supabase.from("carousel_cards").update({ sort_order: i }).eq("id", c.id)));
   }
 
   function openAdd() {
-    setForm(EMPTY);
-    setPhotoFile(null);
-    setPhotoPreview(null);
+    setTitle(""); setIsActive(true);
+    setPhotoFile(null); setPhotoPreview(null);
+    setActionType("none"); setAppTarget("menu");
+    setCategoryId(""); setItemId(""); setPromoCode(""); setExternalUrl("");
     setModal({ open: true, editing: null });
   }
 
   function openEdit(card: Card) {
-    setForm({ title: card.title, image_url: card.image_url ?? "", is_active: card.is_active });
-    setPhotoFile(null);
-    setPhotoPreview(card.image_url);
+    setTitle(card.title); setIsActive(card.is_active);
+    setPhotoFile(null); setPhotoPreview(card.image_url);
+    const parsed = parseActionUrl(card.action_url);
+    setActionType(parsed.type); setAppTarget(parsed.appTarget);
+    setCategoryId(parsed.categoryId); setItemId(parsed.itemId);
+    setPromoCode(parsed.promoCode); setExternalUrl(parsed.externalUrl);
     setModal({ open: true, editing: card });
   }
 
   function closeModal() {
     setModal({ open: false, editing: null });
-    setPhotoFile(null);
-    setPhotoPreview(null);
-  }
-
-  function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setPhotoFile(file);
-    setPhotoPreview(URL.createObjectURL(file));
+    setPhotoFile(null); setPhotoPreview(null);
   }
 
   async function save() {
-    if (!form.title) return;
+    if (!title) return;
     setSaving(true);
-    let imageUrl = form.image_url || null;
+    let imageUrl = modal.editing?.image_url ?? null;
 
     if (photoFile) {
       try {
@@ -157,13 +220,14 @@ export default function CarouselPage() {
         if (error) throw error;
         imageUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/carousel-images/${path}`;
       } catch (e: any) {
-        toast.error("Фото не загружено: " + (e.message ?? "создайте bucket carousel-images в Storage"));
-        setSaving(false);
-        return;
+        toast.error("Фото не загружено: " + (e.message ?? ""));
+        setSaving(false); return;
       }
     }
+    if (photoPreview === null) imageUrl = null;
 
-    const payload = { title: form.title, image_url: imageUrl, is_active: form.is_active };
+    const action_url = buildActionUrl(actionType, appTarget, categoryId, itemId, promoCode, externalUrl);
+    const payload = { title, image_url: imageUrl, action_url, is_active: isActive };
 
     if (modal.editing) {
       await supabase.from("carousel_cards").update(payload).eq("id", modal.editing.id);
@@ -173,9 +237,7 @@ export default function CarouselPage() {
       toast.success("Карточка добавлена");
     }
 
-    closeModal();
-    await fetchCards();
-    setSaving(false);
+    closeModal(); await fetchCards(); setSaving(false);
   }
 
   async function deleteCard(card: Card) {
@@ -189,6 +251,9 @@ export default function CarouselPage() {
     await supabase.from("carousel_cards").update({ is_active: !card.is_active }).eq("id", card.id);
     setCards(p => p.map(c => c.id === card.id ? { ...c, is_active: !c.is_active } : c));
   }
+
+  const categoryOptions = categories.map(c => ({ value: c.id, label: c.name }));
+  const itemOptions = menuItems.map(i => ({ value: i.id, label: i.name }));
 
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-5">
@@ -212,11 +277,7 @@ export default function CarouselPage() {
             ))}
           </div>
         )}
-
-        {!loading && cards.length === 0 && (
-          <div className="py-16 text-center text-neutral-400">Нет карточек</div>
-        )}
-
+        {!loading && cards.length === 0 && <div className="py-16 text-center text-neutral-400">Нет карточек</div>}
         {!loading && cards.length > 0 && (
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext items={cards.map(c => c.id)} strategy={verticalListSortingStrategy}>
@@ -230,18 +291,19 @@ export default function CarouselPage() {
 
       {modal.open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-card-lg w-full max-w-md animate-scale-in">
+          <div className="bg-white rounded-2xl shadow-card-lg w-full max-w-md max-h-[90vh] flex flex-col animate-scale-in">
             <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-200">
               <h2 className="text-xl font-semibold">{modal.editing ? "Редактировать карточку" : "Новая карточка"}</h2>
               <button onClick={closeModal} className="btn-ghost btn-sm"><X size={16} /></button>
             </div>
-            <div className="p-6 space-y-4">
+
+            <div className="overflow-y-auto flex-1 p-6 space-y-4">
               {/* Фото */}
               <div>
                 <label className="label">Фото</label>
                 <div
                   onClick={() => fileInputRef.current?.click()}
-                  className="relative w-full h-48 rounded-xl border-2 border-dashed border-neutral-200 bg-neutral-50 hover:bg-neutral-100 cursor-pointer transition-colors flex items-center justify-center overflow-hidden"
+                  className="relative w-full h-44 rounded-xl border-2 border-dashed border-neutral-200 bg-neutral-50 hover:bg-neutral-100 cursor-pointer transition-colors flex items-center justify-center overflow-hidden"
                 >
                   {photoPreview
                     ? <img src={photoPreview} alt="" className="w-full h-full object-cover rounded-xl" />
@@ -252,13 +314,15 @@ export default function CarouselPage() {
                       </div>
                   }
                 </div>
-                <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={onFileChange} />
+                <input ref={fileInputRef} type="file" accept="image/*" className="hidden"
+                  onChange={e => {
+                    const f = e.target.files?.[0];
+                    if (!f) return;
+                    setPhotoFile(f);
+                    setPhotoPreview(URL.createObjectURL(f));
+                  }} />
                 {photoPreview && (
-                  <button
-                    type="button"
-                    onClick={() => { setPhotoFile(null); setPhotoPreview(null); setForm(p => ({ ...p, image_url: "" })); }}
-                    className="mt-1 text-xs text-danger-500 hover:underline"
-                  >
+                  <button type="button" onClick={() => { setPhotoFile(null); setPhotoPreview(null); }} className="mt-1 text-xs text-danger-500 hover:underline">
                     Удалить фото
                   </button>
                 )}
@@ -267,24 +331,109 @@ export default function CarouselPage() {
               {/* Название */}
               <div>
                 <label className="label">Название *</label>
-                <input
-                  value={form.title}
-                  onChange={e => setForm(p => ({ ...p, title: e.target.value }))}
-                  className="input"
-                  placeholder="Весенняя акция"
-                  autoComplete="off"
-                />
+                <input value={title} onChange={e => setTitle(e.target.value)} className="input" placeholder="Весенняя акция" autoComplete="off" />
+              </div>
+
+              {/* Кнопка «Подробнее» */}
+              <div className="space-y-3">
+                <label className="label">Кнопка «Подробнее»</label>
+
+                {/* Выбор типа */}
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { value: "none", label: "Отключена" },
+                    { value: "url",  label: "Ссылка" },
+                    { value: "app",  label: "В приложении" },
+                  ].map(opt => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setActionType(opt.value as ActionType)}
+                      className={cn(
+                        "flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border text-sm font-medium transition-all",
+                        actionType === opt.value
+                          ? "border-brand-500 bg-brand-50 text-brand-700"
+                          : "border-neutral-200 text-neutral-500 hover:border-neutral-300"
+                      )}
+                    >
+                      {opt.value === "url" && <Link size={13} />}
+                      {opt.value === "app" && <Smartphone size={13} />}
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Внешняя ссылка */}
+                {actionType === "url" && (
+                  <input
+                    value={externalUrl}
+                    onChange={e => setExternalUrl(e.target.value)}
+                    className="input"
+                    placeholder="https://t.me/yourchannel"
+                    autoComplete="off"
+                  />
+                )}
+
+                {/* В приложении */}
+                {actionType === "app" && (
+                  <div className="space-y-3">
+                    <CustomSelect
+                      value={appTarget}
+                      onChange={v => setAppTarget(v as AppTarget)}
+                      options={APP_TARGETS}
+                    />
+                    {appTarget === "category" && (
+                      <div>
+                        <p className="label">Категория</p>
+                        <CustomSelect
+                          value={categoryId}
+                          onChange={setCategoryId}
+                          options={[{ value: "", label: "Выберите категорию…" }, ...categoryOptions]}
+                        />
+                      </div>
+                    )}
+                    {appTarget === "item" && (
+                      <div>
+                        <p className="label">Блюдо</p>
+                        <CustomSelect
+                          value={itemId}
+                          onChange={setItemId}
+                          options={[{ value: "", label: "Выберите блюдо…" }, ...itemOptions]}
+                        />
+                      </div>
+                    )}
+                    {appTarget === "promo" && (
+                      <div>
+                        <p className="label">Код промокода</p>
+                        <input
+                          value={promoCode}
+                          onChange={e => setPromoCode(e.target.value.toUpperCase())}
+                          className="input font-mono"
+                          placeholder="SUMMER20"
+                          autoComplete="off"
+                        />
+                      </div>
+                    )}
+                    {/* Превью итогового URL */}
+                    {buildActionUrl(actionType, appTarget, categoryId, itemId, promoCode, externalUrl) && (
+                      <p className="text-xs text-neutral-400 font-mono bg-neutral-50 rounded-lg px-3 py-2 break-all">
+                        {buildActionUrl(actionType, appTarget, categoryId, itemId, promoCode, externalUrl)}
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Активна */}
               <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <input type="checkbox" checked={form.is_active} onChange={e => setForm(p => ({ ...p, is_active: e.target.checked }))} className="w-4 h-4 rounded accent-brand-500" />
+                <input type="checkbox" checked={isActive} onChange={e => setIsActive(e.target.checked)} className="w-4 h-4 rounded accent-brand-500" />
                 Показывать в карусели
               </label>
             </div>
+
             <div className="flex justify-end gap-2 px-6 py-4 border-t border-neutral-200">
               <button onClick={closeModal} className="btn-secondary btn-md">Отмена</button>
-              <button onClick={save} disabled={saving || !form.title} className="btn-primary btn-md">
+              <button onClick={save} disabled={saving || !title} className="btn-primary btn-md">
                 {saving && <Loader2 size={14} className="animate-spin" />} Сохранить
               </button>
             </div>
