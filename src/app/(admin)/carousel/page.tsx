@@ -90,12 +90,14 @@ function parseActionUrl(url: string | null): {
   const base2 = { ...base, type: "app" as ActionType, menuType: mt };
 
   if (/^app:\/\/menu(\?type=(hot|frozen))?$/.test(url)) return { ...base2, appTarget: "menu" };
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const PROMO_RE = /^[A-Z0-9_-]{1,50}$/;
   const catM = /app:\/\/menu\?.*category=([^&]+)/.exec(url);
-  if (catM) return { ...base2, appTarget: "category", categoryId: catM[1] };
+  if (catM && UUID_RE.test(catM[1])) return { ...base2, appTarget: "category", categoryId: catM[1] };
   const itemM = /app:\/\/menu\?.*item=([^&]+)/.exec(url);
-  if (itemM) return { ...base2, appTarget: "item", itemId: itemM[1] };
+  if (itemM && UUID_RE.test(itemM[1])) return { ...base2, appTarget: "item", itemId: itemM[1] };
   const promoM = /app:\/\/promo\?code=([^&]+)/.exec(url);
-  if (promoM) return { ...base2, appTarget: "promo", promoCode: promoM[1] };
+  if (promoM && PROMO_RE.test(promoM[1].toUpperCase())) return { ...base2, appTarget: "promo", promoCode: promoM[1].toUpperCase() };
 
   return { ...base, type: "url", externalUrl: url };
 }
@@ -114,9 +116,11 @@ function buildActionUrl(
   }
   const mt = menuType === "frozen" ? "?type=frozen" : "";
   if (appTarget === "menu")     return `app://menu${mt}`;
-  if (appTarget === "category") return categoryId ? `app://menu?${menuType === "frozen" ? "type=frozen&" : ""}category=${categoryId}` : null;
-  if (appTarget === "item")     return itemId     ? `app://menu?${menuType === "frozen" ? "type=frozen&" : ""}item=${itemId}`         : null;
-  if (appTarget === "promo")    return promoCode  ? `app://promo?code=${promoCode}` : null;
+  const UUID_RE2 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const PROMO_RE2 = /^[A-Z0-9_-]{1,50}$/;
+  if (appTarget === "category") return (categoryId && UUID_RE2.test(categoryId)) ? `app://menu?${menuType === "frozen" ? "type=frozen&" : ""}category=${categoryId}` : null;
+  if (appTarget === "item")     return (itemId && UUID_RE2.test(itemId))         ? `app://menu?${menuType === "frozen" ? "type=frozen&" : ""}item=${itemId}`         : null;
+  if (appTarget === "promo")    return (promoCode && PROMO_RE2.test(promoCode))  ? `app://promo?code=${promoCode}` : null;
   return null;
 }
 
