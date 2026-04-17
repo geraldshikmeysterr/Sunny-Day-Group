@@ -67,9 +67,10 @@ export default function ActiveOrdersPage() {
       if (!res.ok) throw new Error("Ошибка обновления статуса");
       toast.success(`→ ${ORDER_STATUS_LABELS[next]}`);
       fetchOrders();
-    } catch {
-      await supabase.from("orders").update({ status: next }).eq("id", orderId);
-      fetchOrders();
+    } catch (err) {
+      // No direct DB fallback — Edge Function enforces city-scoped auth
+      toast.error("Не удалось обновить статус заказа");
+      console.error("advance order error:", err);
     }
     setUpdating(null);
   }

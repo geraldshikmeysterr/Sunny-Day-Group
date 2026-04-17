@@ -12,6 +12,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { Plus, Edit2, Trash2, X, Loader2, ImageIcon, Eye, EyeOff, GripVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { validateImageFile } from "@/lib/validateImageFile";
 import { toast } from "sonner";
 import { CustomSelect } from "@/components/CustomSelect";
 
@@ -371,10 +372,12 @@ export default function CarouselPage() {
                       </div>
                   }
                 </div>
-                <input ref={fileInputRef} type="file" accept="image/*" className="hidden"
-                  onChange={e => {
+                <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
+                  onChange={async e => {
                     const f = e.target.files?.[0];
                     if (!f) return;
+                    const result = await validateImageFile(f);
+                    if (!result.ok) { toast.error(result.error); e.target.value = ""; return; }
                     setPhotoFile(f);
                     setPhotoPreview(URL.createObjectURL(f));
                   }}

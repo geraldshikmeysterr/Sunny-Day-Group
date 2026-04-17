@@ -72,8 +72,14 @@ export default function CitiesPage() {
     if (!addForm.city_name || !addForm.operator_email || !addForm.operator_password) {
       setError("Заполните обязательные поля"); return;
     }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(addForm.operator_email)) {
+      setError("Некорректный формат email"); return;
+    }
     if (addForm.operator_password.length < 8) {
       setError("Пароль должен быть не менее 8 символов"); return;
+    }
+    if (!/[A-Z]/.test(addForm.operator_password) || !/[0-9]/.test(addForm.operator_password)) {
+      setError("Пароль должен содержать минимум одну заглавную букву и одну цифру"); return;
     }
     setSaving(true); setError("");
     try {
@@ -130,6 +136,12 @@ export default function CitiesPage() {
 
       // Смена оператора только если заполнены оба поля
       if (editForm.op_email && editForm.op_password) {
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editForm.op_email)) {
+          setError("Некорректный формат email оператора"); setSaving(false); return;
+        }
+        if (editForm.op_password.length < 8 || !/[A-Z]/.test(editForm.op_password) || !/[0-9]/.test(editForm.op_password)) {
+          setError("Пароль: минимум 8 символов, одна заглавная буква и одна цифра"); setSaving(false); return;
+        }
         const oldOp = operators[editModal.id];
         const token = await getToken();
         // Удаляем старого через Edge Function

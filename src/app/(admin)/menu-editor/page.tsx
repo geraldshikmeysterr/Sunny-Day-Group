@@ -15,6 +15,7 @@ import {
   X, Loader2, Check, ImageIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { validateImageFile } from "@/lib/validateImageFile";
 import { toast } from "sonner";
 
 type MenuType = { id: string; slug: string; name: string };
@@ -519,10 +520,11 @@ export default function MenuEditorPage() {
                   </div>
                 </div>
                 <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
-                  onChange={e => {
+                  onChange={async e => {
                     const f = e.target.files?.[0];
                     if (!f) return;
-                    if (f.size > 5 * 1024 * 1024) { toast.error("Файл слишком большой"); return; }
+                    const result = await validateImageFile(f);
+                    if (!result.ok) { toast.error(result.error); e.target.value = ""; return; }
                     setPhotoFile(f); setPhotoPreview(URL.createObjectURL(f));
                     setForm(p => ({ ...p, image_url: "" }));
                   }} />

@@ -21,7 +21,8 @@ export default function GuestsPage() {
       .order("created_at", { ascending: false })
       .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
     if (search.trim()) {
-      const safe = search.replace(/[(),.%]/g, "");
+      // Escape PostgREST/SQL wildcard characters to prevent pattern injection
+      const safe = search.replaceAll(/[\\%_*]/g, String.raw`\$&`).replaceAll(/[(),. ]/g, "");
       q = q.or(`phone.ilike.%${safe}%,first_name.ilike.%${safe}%,last_name.ilike.%${safe}%`);
     }
     const { data, count } = await q;
