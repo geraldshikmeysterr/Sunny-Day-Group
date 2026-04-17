@@ -29,7 +29,7 @@ async function callEdgeFunction(name: string, body: object, token: string) {
     }
   );
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error ?? `Ошибка ${res.status}`);
+  if (!res.ok) throw new Error(data.error ? String(data.error).slice(0, 120) : `Ошибка ${res.status}`);
   return data;
 }
 
@@ -71,6 +71,9 @@ export default function CitiesPage() {
   async function createCity() {
     if (!addForm.city_name || !addForm.operator_email || !addForm.operator_password) {
       setError("Заполните обязательные поля"); return;
+    }
+    if (addForm.operator_password.length < 8) {
+      setError("Пароль должен быть не менее 8 символов"); return;
     }
     setSaving(true); setError("");
     try {

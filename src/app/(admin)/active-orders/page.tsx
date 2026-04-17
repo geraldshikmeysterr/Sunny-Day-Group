@@ -64,7 +64,7 @@ export default function ActiveOrdersPage() {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
         body: JSON.stringify({ order_id: orderId, status: next }),
       });
-      if (!res.ok) throw new Error((await res.json()).error);
+      if (!res.ok) throw new Error("Ошибка обновления статуса");
       toast.success(`→ ${ORDER_STATUS_LABELS[next]}`);
       fetchOrders();
     } catch {

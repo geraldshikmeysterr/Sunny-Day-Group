@@ -105,7 +105,13 @@ function buildActionUrl(
   categoryId: string, itemId: string, promoCode: string, externalUrl: string,
 ): string | null {
   if (type === "none") return null;
-  if (type === "url")  return externalUrl || null;
+  if (type === "url") {
+    try {
+      const u = new URL(externalUrl);
+      if (u.protocol !== "https:") return null;
+    } catch { return null; }
+    return externalUrl;
+  }
   const mt = menuType === "frozen" ? "?type=frozen" : "";
   if (appTarget === "menu")     return `app://menu${mt}`;
   if (appTarget === "category") return categoryId ? `app://menu?${menuType === "frozen" ? "type=frozen&" : ""}category=${categoryId}` : null;

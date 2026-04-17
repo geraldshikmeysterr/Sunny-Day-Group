@@ -20,7 +20,10 @@ export default function GuestsPage() {
       .select("id,phone,first_name,last_name,created_at,cities(name)", { count: "exact" })
       .order("created_at", { ascending: false })
       .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
-    if (search.trim()) q = q.or(`phone.ilike.%${search}%,first_name.ilike.%${search}%,last_name.ilike.%${search}%`);
+    if (search.trim()) {
+      const safe = search.replace(/[(),.%]/g, "");
+      q = q.or(`phone.ilike.%${safe}%,first_name.ilike.%${safe}%,last_name.ilike.%${safe}%`);
+    }
     const { data, count } = await q;
     setClients(data ?? []); setTotal(count ?? 0); setLoading(false);
   }, [page, search]);
