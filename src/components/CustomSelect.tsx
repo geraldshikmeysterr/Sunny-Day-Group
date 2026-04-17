@@ -5,32 +5,15 @@ import { ChevronDown, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type Option = { value: string; label: string };
-
 type DropdownPos = { top: number; left: number; width: number };
 
-// Обычный select — одиночный выбор без галочек
-export function CustomSelect({ value, onChange, options, className, placeholder }: {
-  value: string; onChange: (v: string) => void;
-  options: Option[]; className?: string; placeholder?: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState<DropdownPos>({ top: 0, left: 0, width: 0 });
-  const btnRef = useRef<HTMLButtonElement>(null);
-  const selected = options.find(o => o.value === value);
-
-  const calcPos = useCallback(() => {
-    if (!btnRef.current) return;
-    const r = btnRef.current.getBoundingClientRect();
-    setPos({ top: r.bottom + 4, left: r.left, width: r.width });
-  }, []);
-
-  function toggle() { calcPos(); setOpen(p => !p); }
-
+function useDropdown(open: boolean, calcPos: () => void, btnRef: React.RefObject<HTMLButtonElement | null>, dropRef: React.RefObject<HTMLDivElement | null>, setOpen: (v: boolean) => void) {
   useEffect(() => {
     if (!open) return;
     function onScroll() { calcPos(); }
     function onMouseDown(e: MouseEvent) {
       if (btnRef.current?.contains(e.target as Node)) return;
+      if (dropRef.current?.contains(e.target as Node)) return;
       setOpen(false);
     }
     globalThis.window.addEventListener("scroll", onScroll, true);
@@ -39,7 +22,29 @@ export function CustomSelect({ value, onChange, options, className, placeholder 
       globalThis.window.removeEventListener("scroll", onScroll, true);
       document.removeEventListener("mousedown", onMouseDown);
     };
-  }, [open, calcPos]);
+  }, [open, calcPos, btnRef, dropRef, setOpen]);
+}
+
+// Обычный select — одиночный выбор без галочек
+export function CustomSelect({ value, onChange, options, className, placeholder }: Readonly<{
+  value: string; onChange: (v: string) => void;
+  options: Option[]; className?: string; placeholder?: string;
+}>) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<DropdownPos>({ top: 0, left: 0, width: 0 });
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const dropRef = useRef<HTMLDivElement>(null);
+  const selected = options.find(o => o.value === value);
+
+  const calcPos = useCallback(() => {
+    if (!btnRef.current) return;
+    const r = btnRef.current.getBoundingClientRect();
+    setPos({ top: r.bottom + 4, left: r.left, width: r.width });
+  }, []);
+
+  useDropdown(open, calcPos, btnRef, dropRef, setOpen);
+
+  function toggle() { calcPos(); setOpen(p => !p); }
 
   return (
     <div className={cn("relative", className)}>
@@ -57,8 +62,9 @@ export function CustomSelect({ value, onChange, options, className, placeholder 
         <ChevronDown size={14} className={cn("shrink-0 text-neutral-400 transition-transform", open && "rotate-180")} />
       </button>
 
-      {open && typeof window !== "undefined" && createPortal(
+      {open && globalThis.window !== undefined && createPortal(
         <div
+          ref={dropRef}
           className="fixed z-[200] bg-white rounded-xl shadow-card-lg border border-neutral-200 py-1 animate-scale-in max-h-64 overflow-y-auto"
           style={{ top: pos.top, left: pos.left, width: pos.width }}
         >
@@ -80,13 +86,14 @@ export function CustomSelect({ value, onChange, options, className, placeholder 
 }
 
 // Мульти-select с галочками — для выбора нескольких значений (Рестораны → города)
-export function MultiSelect({ values, onChange, options, className, placeholder }: {
+export function MultiSelect({ values, onChange, options, className, placeholder }: Readonly<{
   values: string[]; onChange: (v: string[]) => void;
   options: Option[]; className?: string; placeholder?: string;
-}) {
+}>) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<DropdownPos>({ top: 0, left: 0, width: 0 });
   const btnRef = useRef<HTMLButtonElement>(null);
+  const dropRef = useRef<HTMLDivElement>(null);
 
   const calcPos = useCallback(() => {
     if (!btnRef.current) return;
@@ -94,32 +101,19 @@ export function MultiSelect({ values, onChange, options, className, placeholder 
     setPos({ top: r.bottom + 4, left: r.left, width: r.width });
   }, []);
 
-  function toggle() { calcPos(); setOpen(p => !p); }
+  useDropdown(open, calcPos, btnRef, dropRef, setOpen);
 
-  useEffect(() => {
-    if (!open) return;
-    function onScroll() { calcPos(); }
-    function onMouseDown(e: MouseEvent) {
-      if (btnRef.current?.contains(e.target as Node)) return;
-      setOpen(false);
-    }
-    globalThis.window.addEventListener("scroll", onScroll, true);
-    document.addEventListener("mousedown", onMouseDown);
-    return () => {
-      globalThis.window.removeEventListener("scroll", onScroll, true);
-      document.removeEventListener("mousedown", onMouseDown);
-    };
-  }, [open, calcPos]);
+  function toggle() { calcPos(); setOpen(p => !p); }
 
   function toggleItem(v: string) {
     onChange(values.includes(v) ? values.filter(x => x !== v) : [...values, v]);
   }
 
-  const label = values.length === 0
-    ? (placeholder ?? "Выберите...")
-    : values.length === options.length
-    ? "Все"
-    : options.filter(o => values.includes(o.value)).map(o => o.label).join(", ");
+  const labelText = (() => {
+    if (values.length === 0) return placeholder ?? "Выберите...";
+    if (values.length === options.length) return "Все";
+    return options.filter(o => values.includes(o.value)).map(o => o.label).join(", ");
+  })();
 
   return (
     <div className={cn("relative", className)}>
@@ -132,13 +126,14 @@ export function MultiSelect({ values, onChange, options, className, placeholder 
           open && "border-brand-500 ring-2 ring-brand-500/20"
         )}>
         <span className={cn("truncate", values.length ? "text-neutral-900" : "text-neutral-400")}>
-          {label}
+          {labelText}
         </span>
         <ChevronDown size={14} className={cn("shrink-0 text-neutral-400 transition-transform", open && "rotate-180")} />
       </button>
 
-      {open && typeof window !== "undefined" && createPortal(
+      {open && globalThis.window !== undefined && createPortal(
         <div
+          ref={dropRef}
           className="fixed z-[200] bg-white rounded-xl shadow-card-lg border border-neutral-200 py-1 animate-scale-in max-h-64 overflow-y-auto"
           style={{ top: pos.top, left: pos.left, width: pos.width }}
         >
