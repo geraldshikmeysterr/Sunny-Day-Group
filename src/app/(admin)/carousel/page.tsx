@@ -181,6 +181,7 @@ export default function CarouselPage() {
   const [cards, setCards]       = useState<Card[]>([]);
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [menuItems, setMenuItems]   = useState<{ id: string; name: string }[]>([]);
+  const [promos, setPromos]         = useState<{ code: string }[]>([]);
   const [loading, setLoading]   = useState(true);
   const [modal, setModal]       = useState<{ open: boolean; editing: Card | null }>({ open: false, editing: null });
   const [saving, setSaving]     = useState(false);
@@ -216,6 +217,7 @@ export default function CarouselPage() {
     fetchCards();
     supabase.from("categories").select("id,name").eq("is_active", true).order("name").then(({ data }) => setCategories(data ?? []));
     supabase.from("menu_items").select("id,name").eq("is_global_active", true).order("name").then(({ data }) => setMenuItems(data ?? []));
+    supabase.from("promocodes").select("code").eq("is_active", true).order("code").then(({ data }) => setPromos(data ?? []));
   }, [fetchCards]);
 
   async function handleDragEnd(event: DragEndEvent) {
@@ -430,12 +432,10 @@ export default function CarouselPage() {
                       />
                     )}
                     {appTarget === "promo" && (
-                      <input
+                      <CustomSelect
                         value={promoCode}
-                        onChange={e => setPromoCode(e.target.value.toUpperCase())}
-                        className="input font-mono"
-                        placeholder="SUMMER20"
-                        autoComplete="off"
+                        onChange={setPromoCode}
+                        options={[{ value: "", label: "Выберите промокод…" }, ...promos.map(p => ({ value: p.code, label: p.code }))]}
                       />
                     )}
                   </div>
