@@ -77,13 +77,17 @@ export default function AvailabilityPage() {
   const load = useCallback(async () => {
     if (!loaded) return;
     setLoading(true);
-    const [cityRes, typeRes, catRes, itemRes, cmiRes] = await Promise.all([
+    const [cityRes, typeRes, catRes, itemRes, cmi0, cmi1, cmi2, cmi3] = await Promise.all([
       supabase.from("cities").select("id,name").order("name"),
       supabase.from("menu_types").select("*"),
       supabase.from("categories").select("id,name,menu_type_id,sort_order").eq("is_active", true).order("sort_order"),
       supabase.from("menu_items").select("id,name,category_id,weight_grams,categories(menu_type_id)").eq("is_global_active", true).order("sort_order"),
-      supabase.from("city_menu_items").select("city_id,menu_item_id,price,is_available").limit(10000),
+      supabase.from("city_menu_items").select("city_id,menu_item_id,price,is_available").range(0, 999),
+      supabase.from("city_menu_items").select("city_id,menu_item_id,price,is_available").range(1000, 1999),
+      supabase.from("city_menu_items").select("city_id,menu_item_id,price,is_available").range(2000, 2999),
+      supabase.from("city_menu_items").select("city_id,menu_item_id,price,is_available").range(3000, 3999),
     ]);
+    const cmiRes = { data: [...(cmi0.data ?? []), ...(cmi1.data ?? []), ...(cmi2.data ?? []), ...(cmi3.data ?? [])] };
 
     const cities = cityRes.data ?? [];
     const types  = typeRes.data ?? [];
