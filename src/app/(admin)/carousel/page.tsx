@@ -139,7 +139,7 @@ export default function CarouselPage() {
 
   // Основная форма
   const [title, setTitle] = useState("");
-  const [isActive, setIsActive] = useState(true);
+  const [isActive, setIsActive] = useState(false);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
 
@@ -321,11 +321,6 @@ export default function CarouselPage() {
                     setPhotoFile(f);
                     setPhotoPreview(URL.createObjectURL(f));
                   }} />
-                {photoPreview && (
-                  <button type="button" onClick={() => { setPhotoFile(null); setPhotoPreview(null); }} className="mt-1 text-xs text-danger-500 hover:underline">
-                    Удалить фото
-                  </button>
-                )}
               </div>
 
               {/* Название */}
@@ -338,8 +333,8 @@ export default function CarouselPage() {
               <div className="space-y-3">
                 <label className="label">Кнопка «Подробнее»</label>
 
-                {/* Выбор типа */}
-                <div className="grid grid-cols-3 gap-2">
+                {/* Выбор типа — сегментированный переключатель */}
+                <div className="flex items-center bg-neutral-200 rounded-xl p-1 gap-1">
                   {[
                     { value: "none", label: "Отключена" },
                     { value: "url",  label: "Ссылка" },
@@ -350,10 +345,10 @@ export default function CarouselPage() {
                       type="button"
                       onClick={() => setActionType(opt.value as ActionType)}
                       className={cn(
-                        "flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border text-sm font-medium transition-all",
+                        "flex-1 flex items-center justify-center gap-1.5 h-9 rounded-lg text-sm font-medium transition-all",
                         actionType === opt.value
-                          ? "border-brand-500 bg-brand-50 text-brand-700"
-                          : "border-neutral-200 text-neutral-500 hover:border-neutral-300"
+                          ? "bg-brand-500 text-white shadow-sm"
+                          : "text-neutral-600 hover:text-neutral-900"
                       )}
                     >
                       {opt.value === "url" && <Link size={13} />}
