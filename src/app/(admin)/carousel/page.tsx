@@ -48,13 +48,13 @@ function SegmentedControl<T extends string>({
   const pct     = idx * 100;
 
   return (
-    <div className="relative flex bg-neutral-200 rounded-xl p-1">
+    <div className="relative flex bg-neutral-200 rounded-xl p-1" style={{ height: "2.5rem" }}>
       {/* sliding pill */}
       <div
-        className="absolute top-1 bottom-1 rounded-lg bg-brand-500 shadow-sm pointer-events-none"
+        className="absolute rounded-lg bg-brand-500 shadow-sm pointer-events-none"
         style={{
+          top: 4, bottom: 4, left: 4,
           width: `calc((100% - 8px) / ${count})`,
-          left: 4,
           transform: `translateX(${pct}%)`,
           transition: "transform 180ms ease-out",
         }}
@@ -65,7 +65,7 @@ function SegmentedControl<T extends string>({
           type="button"
           onClick={() => onChange(opt.value)}
           className={cn(
-            "relative flex-1 h-9 text-sm font-medium z-10 rounded-lg transition-colors duration-150",
+            "relative flex-1 text-sm font-medium z-10 rounded-lg transition-colors duration-150",
             value === opt.value ? "text-white" : "text-neutral-600 hover:text-neutral-900"
           )}
         >
@@ -364,7 +364,7 @@ export default function CarouselPage() {
               {/* Название */}
               <div>
                 <label className="label">Название *</label>
-                <input value={title} onChange={e => setTitle(e.target.value)} className="input" placeholder="Весенняя акция" autoComplete="off" />
+                <input value={title} onChange={e => setTitle(e.target.value)} className="input" placeholder="Название карточки" autoComplete="off" />
               </div>
 
               {/* Кнопка «Подробнее» */}
@@ -386,7 +386,7 @@ export default function CarouselPage() {
                     value={externalUrl}
                     onChange={e => setExternalUrl(e.target.value)}
                     className="input"
-                    placeholder="https://t.me/yourchannel"
+                    placeholder="https://www.sunnydaygroup.ru/"
                     autoComplete="off"
                   />
                 )}
@@ -408,6 +408,7 @@ export default function CarouselPage() {
                       value={appTarget}
                       onChange={v => setAppTarget(v as AppTarget)}
                       options={APP_TARGETS}
+                      upward
                     />
 
                     {appTarget === "category" && (
@@ -415,6 +416,7 @@ export default function CarouselPage() {
                         value={categoryId}
                         onChange={setCategoryId}
                         options={[{ value: "", label: "Выберите категорию…" }, ...categoryOptions]}
+                        upward
                       />
                     )}
                     {appTarget === "item" && (
@@ -422,6 +424,7 @@ export default function CarouselPage() {
                         value={itemId}
                         onChange={setItemId}
                         options={[{ value: "", label: "Выберите блюдо…" }, ...itemOptions]}
+                        upward
                       />
                     )}
                     {appTarget === "promo" && (

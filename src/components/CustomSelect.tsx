@@ -6,9 +6,9 @@ import { cn } from "@/lib/utils";
 type Option = { value: string; label: string };
 
 // Обычный select — одиночный выбор без галочек
-export function CustomSelect({ value, onChange, options, className, placeholder }: {
+export function CustomSelect({ value, onChange, options, className, placeholder, upward }: {
   value: string; onChange: (v: string) => void;
-  options: Option[]; className?: string; placeholder?: string;
+  options: Option[]; className?: string; placeholder?: string; upward?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -39,7 +39,7 @@ export function CustomSelect({ value, onChange, options, className, placeholder 
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-[calc(100%+4px)] z-20 bg-white rounded-xl shadow-card-lg border border-neutral-200 w-full py-1 animate-scale-in max-h-64 overflow-y-auto">
+          <div className={cn("absolute left-0 z-20 bg-white rounded-xl shadow-card-lg border border-neutral-200 w-full py-1 animate-scale-in max-h-64 overflow-y-auto", upward ? "bottom-[calc(100%+4px)]" : "top-[calc(100%+4px)]")}>
             {options.map(opt => (
               <button key={opt.value} type="button"
                 onClick={() => { onChange(opt.value); setOpen(false); }}
