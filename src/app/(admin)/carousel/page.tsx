@@ -48,7 +48,7 @@ function SegmentedControl<T extends string>({
   const pct     = idx * 100;
 
   return (
-    <div className="relative flex bg-neutral-200 rounded-xl overflow-hidden" style={{ height: "2.5rem" }}>
+    <div className="relative flex bg-neutral-200 rounded-xl overflow-hidden" style={{ height: "2.25rem" }}>
       {/* sliding pill */}
       <div
         className="absolute inset-y-0 rounded-xl bg-brand-500 pointer-events-none"
@@ -340,7 +340,12 @@ export default function CarouselPage() {
                 <label className="label">Фото</label>
                 <div
                   onClick={() => fileInputRef.current?.click()}
-                  className="relative w-full h-44 rounded-xl border-2 border-dashed border-neutral-200 bg-neutral-50 hover:bg-neutral-100 cursor-pointer transition-colors flex items-center justify-center overflow-hidden"
+                  className={cn(
+                    "relative w-full h-44 rounded-xl cursor-pointer transition-colors flex items-center justify-center overflow-hidden",
+                    photoPreview
+                      ? "bg-neutral-100 hover:brightness-95"
+                      : "border-2 border-dashed border-neutral-200 bg-neutral-50 hover:bg-neutral-100"
+                  )}
                 >
                   {photoPreview
                     ? <img src={photoPreview} alt="" className="w-full h-full object-cover rounded-xl" />
