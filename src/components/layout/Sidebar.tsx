@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -8,6 +8,7 @@ import {
   MapPin, Ticket, Users, UserCog, LogOut, ChevronRight, Calendar, LayoutList,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { useAdmin } from "@/components/layout/AdminContext";
 
 const NAV = [
   { title: "Основное", items: [
@@ -35,20 +36,19 @@ export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
-  const [role, setRole] = useState<"superadmin"|"operator"|null>(null);
+  const { isAdmin, cityId, loaded } = useAdmin();
+
+  let role: "superadmin" | "operator" | null = null;
+  if (loaded) {
+    if (isAdmin) role = "superadmin";
+    else if (cityId) role = "operator";
+  }
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (!session?.user) { router.replace("/login"); return; }
-      const userId = session.user.id;
-      const { data: admin } = await supabase.from("admins").select("id").eq("id", userId).maybeSingle();
-      if (admin) { setRole("superadmin"); return; }
-      const { data: op } = await supabase.from("operators").select("id").eq("id", userId).maybeSingle();
-      if (op) { setRole("operator"); return; }
-      await supabase.auth.signOut(); router.replace("/login");
-    });
-    return () => subscription.unsubscribe();
-  }, []);
+    if (loaded && role === null) {
+      supabase.auth.signOut().then(() => router.replace("/login"));
+    }
+  }, [loaded, role]);
 
   const isActive = (href: string) => {
     if (href === "/menu-editor") return pathname === "/menu-editor";
