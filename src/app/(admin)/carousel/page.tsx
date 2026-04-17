@@ -10,7 +10,7 @@ import {
   useSortable, verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Plus, Edit2, Trash2, X, Loader2, ImageIcon, Eye, EyeOff, GripVertical, Link, Smartphone } from "lucide-react";
+import { Plus, Edit2, Trash2, X, Loader2, ImageIcon, Eye, EyeOff, GripVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { CustomSelect } from "@/components/CustomSelect";
@@ -25,64 +25,111 @@ type Card = {
 };
 
 type ActionType = "none" | "url" | "app";
-type AppTarget = "menu" | "category" | "factory" | "promo" | "item";
+type MenuType  = "hot" | "frozen";
+type AppTarget = "menu" | "category" | "item" | "promo";
 
 const APP_TARGETS: { value: AppTarget; label: string }[] = [
-  { value: "menu",     label: "Меню (главная)" },
+  { value: "menu",     label: "Меню" },
   { value: "category", label: "Категория" },
-  { value: "factory",  label: "Завод" },
-  { value: "promo",    label: "Промокод" },
   { value: "item",     label: "Блюдо" },
+  { value: "promo",    label: "Промокод" },
 ];
 
-// Парсим сохранённый action_url обратно в UI-состояние
-function parseActionUrl(url: string | null): { type: ActionType; appTarget: AppTarget; categoryId: string; itemId: string; promoCode: string; externalUrl: string } {
-  const base = { appTarget: "menu" as AppTarget, categoryId: "", itemId: "", promoCode: "", externalUrl: "" };
+// ── Sliding segmented control ─────────────────────────────────────────────────
+function SegmentedControl<T extends string>({
+  value, onChange, options,
+}: {
+  value: T;
+  onChange: (v: T) => void;
+  options: { value: T; label: string }[];
+}) {
+  const count   = options.length;
+  const idx     = options.findIndex(o => o.value === value);
+  const pct     = idx * 100;
+
+  return (
+    <div className="relative flex bg-neutral-200 rounded-xl p-1">
+      {/* sliding pill */}
+      <div
+        className="absolute top-1 bottom-1 rounded-lg bg-brand-500 shadow-sm pointer-events-none"
+        style={{
+          width: `calc((100% - 8px) / ${count})`,
+          left: 4,
+          transform: `translateX(${pct}%)`,
+          transition: "transform 180ms ease-out",
+        }}
+      />
+      {options.map(opt => (
+        <button
+          key={opt.value}
+          type="button"
+          onClick={() => onChange(opt.value)}
+          className={cn(
+            "relative flex-1 h-9 text-sm font-medium z-10 rounded-lg transition-colors duration-150",
+            value === opt.value ? "text-white" : "text-neutral-600 hover:text-neutral-900"
+          )}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function parseActionUrl(url: string | null): {
+  type: ActionType; menuType: MenuType; appTarget: AppTarget;
+  categoryId: string; itemId: string; promoCode: string; externalUrl: string;
+} {
+  const base = { menuType: "hot" as MenuType, appTarget: "menu" as AppTarget, categoryId: "", itemId: "", promoCode: "", externalUrl: "" };
   if (!url) return { ...base, type: "none" };
   if (url.startsWith("http://") || url.startsWith("https://")) return { ...base, type: "url", externalUrl: url };
-  if (url === "app://menu") return { ...base, type: "app", appTarget: "menu" };
-  if (url === "app://factory") return { ...base, type: "app", appTarget: "factory" };
-  const catMatch = url.match(/^app:\/\/menu\?category=(.+)$/);
-  if (catMatch) return { ...base, type: "app", appTarget: "category", categoryId: catMatch[1] };
-  const itemMatch = url.match(/^app:\/\/menu\?item=(.+)$/);
-  if (itemMatch) return { ...base, type: "app", appTarget: "item", itemId: itemMatch[1] };
-  const promoMatch = url.match(/^app:\/\/promo\?code=(.+)$/);
-  if (promoMatch) return { ...base, type: "app", appTarget: "promo", promoCode: promoMatch[1] };
+
+  const frozen = url.includes("type=frozen");
+  const mt: MenuType = frozen ? "frozen" : "hot";
+  const base2 = { ...base, type: "app" as ActionType, menuType: mt };
+
+  if (/^app:\/\/menu(\?type=(hot|frozen))?$/.test(url)) return { ...base2, appTarget: "menu" };
+  const catM = /app:\/\/menu\?.*category=([^&]+)/.exec(url);
+  if (catM) return { ...base2, appTarget: "category", categoryId: catM[1] };
+  const itemM = /app:\/\/menu\?.*item=([^&]+)/.exec(url);
+  if (itemM) return { ...base2, appTarget: "item", itemId: itemM[1] };
+  const promoM = /app:\/\/promo\?code=([^&]+)/.exec(url);
+  if (promoM) return { ...base2, appTarget: "promo", promoCode: promoM[1] };
+
   return { ...base, type: "url", externalUrl: url };
 }
 
-// Собираем action_url из UI-состояния
-function buildActionUrl(type: ActionType, appTarget: AppTarget, categoryId: string, itemId: string, promoCode: string, externalUrl: string): string | null {
+function buildActionUrl(
+  type: ActionType, menuType: MenuType, appTarget: AppTarget,
+  categoryId: string, itemId: string, promoCode: string, externalUrl: string,
+): string | null {
   if (type === "none") return null;
-  if (type === "url") return externalUrl || null;
-  if (appTarget === "menu") return "app://menu";
-  if (appTarget === "factory") return "app://factory";
-  if (appTarget === "category") return categoryId ? `app://menu?category=${categoryId}` : null;
-  if (appTarget === "item") return itemId ? `app://menu?item=${itemId}` : null;
-  if (appTarget === "promo") return promoCode ? `app://promo?code=${promoCode}` : null;
+  if (type === "url")  return externalUrl || null;
+  const mt = menuType === "frozen" ? "?type=frozen" : "";
+  if (appTarget === "menu")     return `app://menu${mt}`;
+  if (appTarget === "category") return categoryId ? `app://menu?${menuType === "frozen" ? "type=frozen&" : ""}category=${categoryId}` : null;
+  if (appTarget === "item")     return itemId     ? `app://menu?${menuType === "frozen" ? "type=frozen&" : ""}item=${itemId}`         : null;
+  if (appTarget === "promo")    return promoCode  ? `app://promo?code=${promoCode}` : null;
   return null;
+}
+
+function actionLabel(url: string | null): string | null {
+  if (!url) return null;
+  if (url.startsWith("http")) return url;
+  if (url.includes("category=")) return url.includes("frozen") ? "Заморозка · Категория" : "Горячие блюда · Категория";
+  if (url.includes("item="))     return url.includes("frozen") ? "Заморозка · Блюдо"     : "Горячие блюда · Блюдо";
+  if (url.includes("promo?"))    return "Промокод: " + (/code=([^&]+)/.exec(url)?.[1] ?? "");
+  if (url.startsWith("app://menu")) return url.includes("frozen") ? "Заморозка · Меню" : "Горячие блюда · Меню";
+  return url;
 }
 
 // ── Sortable row ──────────────────────────────────────────────────────────────
 function SortableCard({ card, onEdit, onDelete, onToggle }: {
-  card: Card;
-  onEdit: (c: Card) => void;
-  onDelete: (c: Card) => void;
-  onToggle: (c: Card) => void;
+  card: Card; onEdit: (c: Card) => void; onDelete: (c: Card) => void; onToggle: (c: Card) => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: card.id });
-
-  const actionLabel = (() => {
-    if (!card.action_url) return null;
-    if (card.action_url.startsWith("http")) return card.action_url;
-    if (card.action_url === "app://menu") return "Меню";
-    if (card.action_url === "app://factory") return "Завод";
-    if (card.action_url.includes("category=")) return "Категория";
-    if (card.action_url.includes("item=")) return "Блюдо";
-    if (card.action_url.includes("promo?code=")) return "Промокод: " + card.action_url.split("code=")[1];
-    return card.action_url;
-  })();
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: card.id });
+  const label = actionLabel(card.action_url);
 
   return (
     <div
@@ -105,12 +152,10 @@ function SortableCard({ card, onEdit, onDelete, onToggle }: {
 
       <div className="flex-1 min-w-0">
         <p className="font-semibold text-neutral-900">{card.title}</p>
-        {actionLabel && (
-          <p className="text-xs text-neutral-400 mt-0.5 truncate max-w-xs">{actionLabel}</p>
-        )}
-        {!card.action_url && (
-          <p className="text-xs text-neutral-300 mt-0.5">Кнопка «Подробнее» отключена</p>
-        )}
+        {label
+          ? <p className="text-xs text-neutral-400 mt-0.5 truncate max-w-xs">{label}</p>
+          : <p className="text-xs text-neutral-300 mt-0.5">Кнопка «Подробнее» отключена</p>
+        }
       </div>
 
       <span className={cn("badge text-xs shrink-0", card.is_active ? "bg-success-50 text-success-700" : "bg-neutral-100 text-neutral-500")}>
@@ -121,37 +166,38 @@ function SortableCard({ card, onEdit, onDelete, onToggle }: {
         <button onClick={() => onToggle(card)} className={cn("btn-ghost btn-sm", card.is_active ? "text-success-500" : "text-neutral-300")}>
           {card.is_active ? <Eye size={15} /> : <EyeOff size={15} />}
         </button>
-        <button onClick={() => onEdit(card)} className="btn-ghost btn-sm text-brand-500"><Edit2 size={15} /></button>
+        <button onClick={() => openEdit(card)} className="btn-ghost btn-sm text-brand-500"><Edit2 size={15} /></button>
         <button onClick={() => onDelete(card)} className="btn-ghost btn-sm text-danger-500"><Trash2 size={15} /></button>
       </div>
     </div>
   );
+
+  function openEdit(c: Card) { onEdit(c); }
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function CarouselPage() {
   const supabase = createClient();
-  const [cards, setCards] = useState<Card[]>([]);
+  const [cards, setCards]       = useState<Card[]>([]);
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
-  const [menuItems, setMenuItems] = useState<{ id: string; name: string }[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [modal, setModal] = useState<{ open: boolean; editing: Card | null }>({ open: false, editing: null });
+  const [menuItems, setMenuItems]   = useState<{ id: string; name: string }[]>([]);
+  const [loading, setLoading]   = useState(true);
+  const [modal, setModal]       = useState<{ open: boolean; editing: Card | null }>({ open: false, editing: null });
+  const [saving, setSaving]     = useState(false);
 
-  // Основная форма
-  const [title, setTitle] = useState("");
-  const [isActive, setIsActive] = useState(false);
+  // form
+  const [title, setTitle]         = useState("");
+  const [isActive, setIsActive]   = useState(false);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-
-  // Action URL форма
   const [actionType, setActionType] = useState<ActionType>("none");
-  const [appTarget, setAppTarget] = useState<AppTarget>("menu");
+  const [menuType, setMenuType]     = useState<MenuType>("hot");
+  const [appTarget, setAppTarget]   = useState<AppTarget>("menu");
   const [categoryId, setCategoryId] = useState("");
-  const [itemId, setItemId] = useState("");
-  const [promoCode, setPromoCode] = useState("");
+  const [itemId, setItemId]         = useState("");
+  const [promoCode, setPromoCode]   = useState("");
   const [externalUrl, setExternalUrl] = useState("");
 
-  const [saving, setSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const sensors = useSensors(
@@ -168,50 +214,42 @@ export default function CarouselPage() {
 
   useEffect(() => {
     fetchCards();
-    supabase.from("categories").select("id,name").eq("is_active", true).order("name")
-      .then(({ data }) => setCategories(data ?? []));
-    supabase.from("menu_items").select("id,name").eq("is_global_active", true).order("name")
-      .then(({ data }) => setMenuItems(data ?? []));
+    supabase.from("categories").select("id,name").eq("is_active", true).order("name").then(({ data }) => setCategories(data ?? []));
+    supabase.from("menu_items").select("id,name").eq("is_global_active", true).order("name").then(({ data }) => setMenuItems(data ?? []));
   }, [fetchCards]);
 
   async function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
-    const oldIndex = cards.findIndex(c => c.id === active.id);
-    const newIndex = cards.findIndex(c => c.id === over.id);
-    const reordered = arrayMove(cards, oldIndex, newIndex);
+    const oldIdx = cards.findIndex(c => c.id === active.id);
+    const newIdx = cards.findIndex(c => c.id === over.id);
+    const reordered = arrayMove(cards, oldIdx, newIdx);
     setCards(reordered);
     await Promise.all(reordered.map((c, i) => supabase.from("carousel_cards").update({ sort_order: i }).eq("id", c.id)));
   }
 
   function openAdd() {
-    setTitle(""); setIsActive(true);
-    setPhotoFile(null); setPhotoPreview(null);
-    setActionType("none"); setAppTarget("menu");
+    setTitle(""); setIsActive(false); setPhotoFile(null); setPhotoPreview(null);
+    setActionType("none"); setMenuType("hot"); setAppTarget("menu");
     setCategoryId(""); setItemId(""); setPromoCode(""); setExternalUrl("");
     setModal({ open: true, editing: null });
   }
 
   function openEdit(card: Card) {
+    const p = parseActionUrl(card.action_url);
     setTitle(card.title); setIsActive(card.is_active);
     setPhotoFile(null); setPhotoPreview(card.image_url);
-    const parsed = parseActionUrl(card.action_url);
-    setActionType(parsed.type); setAppTarget(parsed.appTarget);
-    setCategoryId(parsed.categoryId); setItemId(parsed.itemId);
-    setPromoCode(parsed.promoCode); setExternalUrl(parsed.externalUrl);
+    setActionType(p.type); setMenuType(p.menuType); setAppTarget(p.appTarget);
+    setCategoryId(p.categoryId); setItemId(p.itemId); setPromoCode(p.promoCode); setExternalUrl(p.externalUrl);
     setModal({ open: true, editing: card });
   }
 
-  function closeModal() {
-    setModal({ open: false, editing: null });
-    setPhotoFile(null); setPhotoPreview(null);
-  }
+  function closeModal() { setModal({ open: false, editing: null }); setPhotoFile(null); setPhotoPreview(null); }
 
   async function save() {
     if (!title) return;
     setSaving(true);
     let imageUrl = modal.editing?.image_url ?? null;
-
     if (photoFile) {
       try {
         const ext = photoFile.name.split(".").pop();
@@ -226,7 +264,7 @@ export default function CarouselPage() {
     }
     if (photoPreview === null) imageUrl = null;
 
-    const action_url = buildActionUrl(actionType, appTarget, categoryId, itemId, promoCode, externalUrl);
+    const action_url = buildActionUrl(actionType, menuType, appTarget, categoryId, itemId, promoCode, externalUrl);
     const payload = { title, image_url: imageUrl, action_url, is_active: isActive };
 
     if (modal.editing) {
@@ -236,7 +274,6 @@ export default function CarouselPage() {
       await supabase.from("carousel_cards").insert({ ...payload, sort_order: cards.length });
       toast.success("Карточка добавлена");
     }
-
     closeModal(); await fetchCards(); setSaving(false);
   }
 
@@ -253,7 +290,7 @@ export default function CarouselPage() {
   }
 
   const categoryOptions = categories.map(c => ({ value: c.id, label: c.name }));
-  const itemOptions = menuItems.map(i => ({ value: i.id, label: i.name }));
+  const itemOptions     = menuItems.map(i => ({ value: i.id, label: i.name }));
 
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-5">
@@ -320,7 +357,8 @@ export default function CarouselPage() {
                     if (!f) return;
                     setPhotoFile(f);
                     setPhotoPreview(URL.createObjectURL(f));
-                  }} />
+                  }}
+                />
               </div>
 
               {/* Название */}
@@ -333,32 +371,16 @@ export default function CarouselPage() {
               <div className="space-y-3">
                 <label className="label">Кнопка «Подробнее»</label>
 
-                {/* Выбор типа — сегментированный переключатель */}
-                <div className="flex items-center bg-neutral-200 rounded-xl p-1 gap-1">
-                  {[
+                <SegmentedControl
+                  value={actionType}
+                  onChange={setActionType}
+                  options={[
                     { value: "none", label: "Отключена" },
                     { value: "url",  label: "Ссылка" },
                     { value: "app",  label: "В приложении" },
-                  ].map(opt => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => setActionType(opt.value as ActionType)}
-                      className={cn(
-                        "flex-1 flex items-center justify-center gap-1.5 h-9 rounded-lg text-sm font-medium transition-all",
-                        actionType === opt.value
-                          ? "bg-brand-500 text-white shadow-sm"
-                          : "text-neutral-600 hover:text-neutral-900"
-                      )}
-                    >
-                      {opt.value === "url" && <Link size={13} />}
-                      {opt.value === "app" && <Smartphone size={13} />}
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
+                  ]}
+                />
 
-                {/* Внешняя ссылка */}
                 {actionType === "url" && (
                   <input
                     value={externalUrl}
@@ -369,51 +391,47 @@ export default function CarouselPage() {
                   />
                 )}
 
-                {/* В приложении */}
                 {actionType === "app" && (
                   <div className="space-y-3">
+                    {/* Тип меню */}
+                    <SegmentedControl
+                      value={menuType}
+                      onChange={setMenuType}
+                      options={[
+                        { value: "hot",    label: "Горячие блюда" },
+                        { value: "frozen", label: "Заморозка" },
+                      ]}
+                    />
+
+                    {/* Раздел */}
                     <CustomSelect
                       value={appTarget}
                       onChange={v => setAppTarget(v as AppTarget)}
                       options={APP_TARGETS}
                     />
+
                     {appTarget === "category" && (
-                      <div>
-                        <p className="label">Категория</p>
-                        <CustomSelect
-                          value={categoryId}
-                          onChange={setCategoryId}
-                          options={[{ value: "", label: "Выберите категорию…" }, ...categoryOptions]}
-                        />
-                      </div>
+                      <CustomSelect
+                        value={categoryId}
+                        onChange={setCategoryId}
+                        options={[{ value: "", label: "Выберите категорию…" }, ...categoryOptions]}
+                      />
                     )}
                     {appTarget === "item" && (
-                      <div>
-                        <p className="label">Блюдо</p>
-                        <CustomSelect
-                          value={itemId}
-                          onChange={setItemId}
-                          options={[{ value: "", label: "Выберите блюдо…" }, ...itemOptions]}
-                        />
-                      </div>
+                      <CustomSelect
+                        value={itemId}
+                        onChange={setItemId}
+                        options={[{ value: "", label: "Выберите блюдо…" }, ...itemOptions]}
+                      />
                     )}
                     {appTarget === "promo" && (
-                      <div>
-                        <p className="label">Код промокода</p>
-                        <input
-                          value={promoCode}
-                          onChange={e => setPromoCode(e.target.value.toUpperCase())}
-                          className="input font-mono"
-                          placeholder="SUMMER20"
-                          autoComplete="off"
-                        />
-                      </div>
-                    )}
-                    {/* Превью итогового URL */}
-                    {buildActionUrl(actionType, appTarget, categoryId, itemId, promoCode, externalUrl) && (
-                      <p className="text-xs text-neutral-400 font-mono bg-neutral-50 rounded-lg px-3 py-2 break-all">
-                        {buildActionUrl(actionType, appTarget, categoryId, itemId, promoCode, externalUrl)}
-                      </p>
+                      <input
+                        value={promoCode}
+                        onChange={e => setPromoCode(e.target.value.toUpperCase())}
+                        className="input font-mono"
+                        placeholder="SUMMER20"
+                        autoComplete="off"
+                      />
                     )}
                   </div>
                 )}
