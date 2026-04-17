@@ -1,32 +1,52 @@
 "use client";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { ChevronDown, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type Option = { value: string; label: string };
 
+type DropdownPos = { top: number; left: number; width: number };
+
 // Обычный select — одиночный выбор без галочек
-export function CustomSelect({ value, onChange, options, className, placeholder, upward }: {
+export function CustomSelect({ value, onChange, options, className, placeholder }: {
   value: string; onChange: (v: string) => void;
-  options: Option[]; className?: string; placeholder?: string; upward?: boolean;
+  options: Option[]; className?: string; placeholder?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<DropdownPos>({ top: 0, left: 0, width: 0 });
+  const btnRef = useRef<HTMLButtonElement>(null);
   const selected = options.find(o => o.value === value);
 
-  useEffect(() => {
-    function handler(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+  const calcPos = useCallback(() => {
+    if (!btnRef.current) return;
+    const r = btnRef.current.getBoundingClientRect();
+    setPos({ top: r.bottom + 4, left: r.left, width: r.width });
   }, []);
 
+  function toggle() { calcPos(); setOpen(p => !p); }
+
+  useEffect(() => {
+    if (!open) return;
+    function onScroll() { calcPos(); }
+    function onMouseDown(e: MouseEvent) {
+      if (btnRef.current?.contains(e.target as Node)) return;
+      setOpen(false);
+    }
+    globalThis.window.addEventListener("scroll", onScroll, true);
+    document.addEventListener("mousedown", onMouseDown);
+    return () => {
+      globalThis.window.removeEventListener("scroll", onScroll, true);
+      document.removeEventListener("mousedown", onMouseDown);
+    };
+  }, [open, calcPos]);
+
   return (
-    <div ref={ref} className={cn("relative", className)}>
+    <div className={cn("relative", className)}>
       <button
+        ref={btnRef}
         type="button"
-        onClick={() => setOpen(p => !p)}
+        onClick={toggle}
         className={cn(
           "input text-left flex items-center justify-between gap-2 cursor-pointer w-full",
           open && "border-brand-500 ring-2 ring-brand-500/20"
@@ -36,22 +56,24 @@ export function CustomSelect({ value, onChange, options, className, placeholder,
         </span>
         <ChevronDown size={14} className={cn("shrink-0 text-neutral-400 transition-transform", open && "rotate-180")} />
       </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className={cn("absolute left-0 z-20 bg-white rounded-xl shadow-card-lg border border-neutral-200 w-full py-1 animate-scale-in max-h-64 overflow-y-auto", upward ? "bottom-[calc(100%+4px)]" : "top-[calc(100%+4px)]")}>
-            {options.map(opt => (
-              <button key={opt.value} type="button"
-                onClick={() => { onChange(opt.value); setOpen(false); }}
-                className={cn(
-                  "w-full px-3 py-2 text-sm text-left transition-colors hover:bg-neutral-50",
-                  value === opt.value ? "text-brand-600 font-medium bg-brand-50/50" : "text-neutral-700"
-                )}>
-                {opt.label}
-              </button>
-            ))}
-          </div>
-        </>
+
+      {open && typeof window !== "undefined" && createPortal(
+        <div
+          className="fixed z-[200] bg-white rounded-xl shadow-card-lg border border-neutral-200 py-1 animate-scale-in max-h-64 overflow-y-auto"
+          style={{ top: pos.top, left: pos.left, width: pos.width }}
+        >
+          {options.map(opt => (
+            <button key={opt.value} type="button"
+              onClick={() => { onChange(opt.value); setOpen(false); }}
+              className={cn(
+                "w-full px-3 py-2 text-sm text-left transition-colors hover:bg-neutral-50",
+                value === opt.value ? "text-brand-600 font-medium bg-brand-50/50" : "text-neutral-700"
+              )}>
+              {opt.label}
+            </button>
+          ))}
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -63,17 +85,33 @@ export function MultiSelect({ values, onChange, options, className, placeholder 
   options: Option[]; className?: string; placeholder?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<DropdownPos>({ top: 0, left: 0, width: 0 });
+  const btnRef = useRef<HTMLButtonElement>(null);
 
-  useEffect(() => {
-    function handler(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+  const calcPos = useCallback(() => {
+    if (!btnRef.current) return;
+    const r = btnRef.current.getBoundingClientRect();
+    setPos({ top: r.bottom + 4, left: r.left, width: r.width });
   }, []);
 
-  function toggle(v: string) {
+  function toggle() { calcPos(); setOpen(p => !p); }
+
+  useEffect(() => {
+    if (!open) return;
+    function onScroll() { calcPos(); }
+    function onMouseDown(e: MouseEvent) {
+      if (btnRef.current?.contains(e.target as Node)) return;
+      setOpen(false);
+    }
+    globalThis.window.addEventListener("scroll", onScroll, true);
+    document.addEventListener("mousedown", onMouseDown);
+    return () => {
+      globalThis.window.removeEventListener("scroll", onScroll, true);
+      document.removeEventListener("mousedown", onMouseDown);
+    };
+  }, [open, calcPos]);
+
+  function toggleItem(v: string) {
     onChange(values.includes(v) ? values.filter(x => x !== v) : [...values, v]);
   }
 
@@ -84,10 +122,11 @@ export function MultiSelect({ values, onChange, options, className, placeholder 
     : options.filter(o => values.includes(o.value)).map(o => o.label).join(", ");
 
   return (
-    <div ref={ref} className={cn("relative", className)}>
+    <div className={cn("relative", className)}>
       <button
+        ref={btnRef}
         type="button"
-        onClick={() => setOpen(p => !p)}
+        onClick={toggle}
         className={cn(
           "input text-left flex items-center justify-between gap-2 cursor-pointer w-full",
           open && "border-brand-500 ring-2 ring-brand-500/20"
@@ -97,28 +136,30 @@ export function MultiSelect({ values, onChange, options, className, placeholder 
         </span>
         <ChevronDown size={14} className={cn("shrink-0 text-neutral-400 transition-transform", open && "rotate-180")} />
       </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-[calc(100%+4px)] z-20 bg-white rounded-xl shadow-card-lg border border-neutral-200 w-full py-1 animate-scale-in max-h-64 overflow-y-auto">
-            <div className="flex gap-2 px-3 py-2 border-b border-neutral-100">
-              <button onClick={() => onChange(options.map(o => o.value))} className="text-xs text-brand-500 hover:text-brand-600">Все</button>
-              <span className="text-neutral-300">·</span>
-              <button onClick={() => onChange([])} className="text-xs text-neutral-500 hover:text-neutral-700">Снять</button>
-            </div>
-            {options.map(opt => (
-              <button key={opt.value} type="button"
-                onClick={() => toggle(opt.value)}
-                className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-left hover:bg-neutral-50 transition-colors">
-                <div className={cn("w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors",
-                  values.includes(opt.value) ? "bg-brand-500 border-brand-500" : "border-neutral-300")}>
-                  {values.includes(opt.value) && <Check size={10} className="text-white" />}
-                </div>
-                <span className="truncate">{opt.label}</span>
-              </button>
-            ))}
+
+      {open && typeof window !== "undefined" && createPortal(
+        <div
+          className="fixed z-[200] bg-white rounded-xl shadow-card-lg border border-neutral-200 py-1 animate-scale-in max-h-64 overflow-y-auto"
+          style={{ top: pos.top, left: pos.left, width: pos.width }}
+        >
+          <div className="flex gap-2 px-3 py-2 border-b border-neutral-100">
+            <button onClick={() => onChange(options.map(o => o.value))} className="text-xs text-brand-500 hover:text-brand-600">Все</button>
+            <span className="text-neutral-300">·</span>
+            <button onClick={() => onChange([])} className="text-xs text-neutral-500 hover:text-neutral-700">Снять</button>
           </div>
-        </>
+          {options.map(opt => (
+            <button key={opt.value} type="button"
+              onClick={() => toggleItem(opt.value)}
+              className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-left hover:bg-neutral-50 transition-colors">
+              <div className={cn("w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors",
+                values.includes(opt.value) ? "bg-brand-500 border-brand-500" : "border-neutral-300")}>
+                {values.includes(opt.value) && <Check size={10} className="text-white" />}
+              </div>
+              <span className="truncate">{opt.label}</span>
+            </button>
+          ))}
+        </div>,
+        document.body
       )}
     </div>
   );
