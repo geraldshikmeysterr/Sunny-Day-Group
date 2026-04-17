@@ -82,7 +82,7 @@ export default function AvailabilityPage() {
       supabase.from("menu_types").select("*"),
       supabase.from("categories").select("id,name,menu_type_id,sort_order").eq("is_active", true).order("sort_order"),
       supabase.from("menu_items").select("id,name,category_id,weight_grams,categories(menu_type_id)").eq("is_global_active", true).order("sort_order"),
-      supabase.from("city_menu_items").select("city_id,menu_item_id,price,is_available"),
+      supabase.from("city_menu_items").select("city_id,menu_item_id,price,is_available").limit(10000),
     ]);
 
     const cities = cityRes.data ?? [];

@@ -179,8 +179,8 @@ function SortableCard({ card, onEdit, onDelete, onToggle }: {
 export default function CarouselPage() {
   const supabase = createClient();
   const [cards, setCards]       = useState<Card[]>([]);
-  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
-  const [menuItems, setMenuItems]   = useState<{ id: string; name: string }[]>([]);
+  const [categories, setCategories] = useState<{ id: string; name: string; menu_type_slug: string }[]>([]);
+  const [menuItems, setMenuItems]   = useState<{ id: string; name: string; menu_type_slug: string }[]>([]);
   const [promos, setPromos]         = useState<{ code: string }[]>([]);
   const [loading, setLoading]   = useState(true);
   const [modal, setModal]       = useState<{ open: boolean; editing: Card | null }>({ open: false, editing: null });
@@ -215,8 +215,10 @@ export default function CarouselPage() {
 
   useEffect(() => {
     fetchCards();
-    supabase.from("categories").select("id,name").eq("is_active", true).order("name").then(({ data }) => setCategories(data ?? []));
-    supabase.from("menu_items").select("id,name").eq("is_global_active", true).order("name").then(({ data }) => setMenuItems(data ?? []));
+    supabase.from("categories").select("id,name,menu_types(slug)").eq("is_active", true).order("name")
+      .then(({ data }) => setCategories((data ?? []).map((c: any) => ({ id: c.id, name: c.name, menu_type_slug: c.menu_types?.slug ?? "" }))));
+    supabase.from("menu_items").select("id,name,categories(menu_types(slug))").eq("is_global_active", true).order("name")
+      .then(({ data }) => setMenuItems((data ?? []).map((i: any) => ({ id: i.id, name: i.name, menu_type_slug: i.categories?.menu_types?.slug ?? "" }))));
     supabase.from("promocodes").select("code").eq("is_active", true).order("code").then(({ data }) => setPromos(data ?? []));
   }, [fetchCards]);
 
@@ -291,8 +293,9 @@ export default function CarouselPage() {
     setCards(p => p.map(c => c.id === card.id ? { ...c, is_active: !c.is_active } : c));
   }
 
-  const categoryOptions = categories.map(c => ({ value: c.id, label: c.name }));
-  const itemOptions     = menuItems.map(i => ({ value: i.id, label: i.name }));
+  const targetSlug      = menuType === "frozen" ? "frozen" : "ready_meals";
+  const categoryOptions = categories.filter(c => c.menu_type_slug === targetSlug).map(c => ({ value: c.id, label: c.name }));
+  const itemOptions     = menuItems.filter(i => i.menu_type_slug === targetSlug).map(i => ({ value: i.id, label: i.name }));
 
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-5">
