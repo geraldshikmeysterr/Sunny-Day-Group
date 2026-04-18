@@ -127,7 +127,7 @@ export default function SettingsPage() {
 
       <div className="card p-5 space-y-4">
         <div>
-          <h2 className="text-sm font-normal text-neutral-700">Двухфакторная аутентификация</h2>
+          <p className="text-sm text-neutral-700">Двухфакторная аутентификация</p>
           <p className="text-xs text-neutral-400 mt-0.5">TOTP через Google Authenticator, Authy или 1Password</p>
         </div>
 

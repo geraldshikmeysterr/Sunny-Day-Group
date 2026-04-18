@@ -58,18 +58,11 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-neutral-100">
+    <div className="min-h-screen flex items-center justify-center px-4"
+      style={{ background: "linear-gradient(135deg, #F57300 0%, #C85500 100%)" }}>
       <div className="card w-full max-w-sm p-8">
         <div className="text-center mb-8">
-          <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4"
-            style={{ background: "linear-gradient(135deg, #F57300, #E06500)" }}>
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="5" fill="#FFE32B"/>
-              <path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"
-                stroke="#FFE32B" strokeWidth="2" strokeLinecap="round"/>
-            </svg>
-          </div>
-          <h1 className="text-3xl font-bold text-neutral-900">Солнечный день</h1>
+          <img src="/logo.png" alt="Солнечный день" className="h-12 object-contain mx-auto mb-2" />
           <p className="text-sm text-neutral-500 mt-1">Панель управления</p>
         </div>
 
