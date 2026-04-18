@@ -74,20 +74,39 @@ export default function SettingsPage() {
   async function confirmUnenroll() {
     if (!unenrollConfirm || unenrollCode.length !== 6) return;
     setUnenrolling(true);
-    const { error: verifyErr } = await supabase.auth.mfa.verify({
-      factorId: unenrollConfirm.factorId,
-      challengeId: unenrollConfirm.challengeId,
-      code: unenrollCode,
-    });
-    if (verifyErr) {
-      toast.error("Неверный код");
+    try {
+      const { error: verifyErr } = await supabase.auth.mfa.verify({
+        factorId: unenrollConfirm.factorId,
+        challengeId: unenrollConfirm.challengeId,
+        code: unenrollCode,
+      });
+      if (verifyErr) { toast.error("Неверный код"); return; }
+
+      // После verify клиент удерживает lock на обновление сессии.
+      // Делаем DELETE напрямую через fetch, чтобы не ждать lock.
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { toast.error("Сессия истекла"); return; }
+
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/factors/${unenrollConfirm.factorId}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+          },
+        }
+      );
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        toast.error(body.message ?? "Ошибка при отключении");
+        return;
+      }
+      toast.success("MFA отключена");
+      globalThis.location.reload();
+    } finally {
       setUnenrolling(false);
-      return;
     }
-    const { error } = await supabase.auth.mfa.unenroll({ factorId: unenrollConfirm.factorId });
-    if (error) { toast.error(error.message); setUnenrolling(false); return; }
-    toast.success("MFA отключена");
-    globalThis.location.reload();
   }
 
   const verifiedFactors = factors.filter(f => f.status === "verified");
