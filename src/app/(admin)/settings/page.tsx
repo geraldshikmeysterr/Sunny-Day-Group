@@ -38,8 +38,17 @@ export default function SettingsPage() {
     setEnrolling(true);
     setCode("");
     const { data: existing } = await supabase.auth.mfa.listFactors();
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
     const pending = (existing?.totp ?? []).filter(f => f.status !== "verified");
-    for (const f of pending) await supabase.auth.mfa.unenroll({ factorId: f.id }).catch(() => {});
+    if (token) {
+      for (const f of pending) {
+        await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/factors/${f.id}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}`, apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY! },
+        }).catch(() => {});
+      }
+    }
     const { data, error } = await supabase.auth.mfa.enroll({
       factorType: "totp",
       friendlyName: "Authenticator",

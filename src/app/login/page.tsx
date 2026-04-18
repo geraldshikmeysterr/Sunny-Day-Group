@@ -58,30 +58,34 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4"
-      style={{ background: "linear-gradient(135deg, #F57300 0%, #C85500 100%)" }}>
-      <div className="card w-full max-w-sm p-8">
+    <div className="min-h-screen flex items-center justify-center bg-white px-4">
+      <div className="w-full max-w-sm rounded-2xl p-8 shadow-xl"
+        style={{ background: "linear-gradient(135deg, #F57300 0%, #C85500 100%)" }}>
+
         <div className="text-center mb-8">
-          <img src="/logo.png" alt="Солнечный день" className="h-12 object-contain mx-auto mb-2" />
-          <p className="text-sm text-neutral-500 mt-1">Панель управления</p>
+          <img src="/logo.png" alt="Солнечный день" className="h-12 object-contain mx-auto mb-3" />
+          <p className="text-sm text-white/70">Панель управления</p>
         </div>
 
         {!mfaStep ? (
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="label">Email</label>
+              <label className="block text-xs font-medium text-white/80 mb-1">Email</label>
               <input type="email" value={email} onChange={e => setEmail(e.target.value)}
-                placeholder="operator@city.ru" required className="input" />
+                placeholder="operator@city.ru" required
+                className="w-full px-3 py-2.5 rounded-xl text-sm bg-white/15 text-white placeholder-white/40 border border-white/25 outline-none focus:bg-white/25 focus:border-white/50 transition" />
             </div>
             <div>
-              <label className="label">Пароль</label>
+              <label className="block text-xs font-medium text-white/80 mb-1">Пароль</label>
               <input type="password" value={password} onChange={e => setPassword(e.target.value)}
-                placeholder="••••••••" required className="input" />
+                placeholder="••••••••" required
+                className="w-full px-3 py-2.5 rounded-xl text-sm bg-white/15 text-white placeholder-white/40 border border-white/25 outline-none focus:bg-white/25 focus:border-white/50 transition" />
             </div>
             {error && (
-              <div className="text-sm text-danger-600 bg-danger-50 px-3 py-2.5 rounded-lg">{error}</div>
+              <div className="text-sm text-white bg-white/20 px-3 py-2.5 rounded-xl">{error}</div>
             )}
-            <button type="submit" disabled={loading} className="btn-primary btn-md w-full mt-2">
+            <button type="submit" disabled={loading}
+              className="w-full flex items-center justify-center gap-2 bg-white text-orange-500 font-semibold text-sm py-2.5 rounded-xl hover:bg-white/90 transition mt-2 disabled:opacity-60">
               {loading && <Loader2 size={14} className="animate-spin" />}
               {loading ? "Вход..." : "Войти"}
             </button>
@@ -89,13 +93,13 @@ export default function LoginPage() {
         ) : (
           <form onSubmit={handleMfa} className="space-y-4">
             <div className="text-center space-y-1">
-              <p className="text-sm font-medium text-neutral-700">Двухфакторная аутентификация</p>
-              <p className="text-xs text-neutral-400">Введи код из приложения-аутентификатора</p>
+              <p className="text-sm font-medium text-white">Двухфакторная аутентификация</p>
+              <p className="text-xs text-white/60">Введи код из приложения-аутентификатора</p>
             </div>
             <input
               value={mfaCode}
               onChange={e => setMfaCode(e.target.value.replaceAll(/\D/g, "").slice(0, 6))}
-              className="input text-center text-2xl font-mono tracking-[0.5em] pl-[0.5em] w-full"
+              className="w-full px-3 py-2.5 rounded-xl text-center text-2xl font-mono tracking-[0.5em] pl-[0.5em] bg-white/15 text-white placeholder-white/40 border border-white/25 outline-none focus:bg-white/25 focus:border-white/50 transition"
               placeholder="000000"
               maxLength={6}
               autoComplete="one-time-code"
@@ -103,14 +107,15 @@ export default function LoginPage() {
               autoFocus
             />
             {error && (
-              <div className="text-sm text-danger-600 bg-danger-50 px-3 py-2.5 rounded-lg">{error}</div>
+              <div className="text-sm text-white bg-white/20 px-3 py-2.5 rounded-xl">{error}</div>
             )}
-            <button type="submit" disabled={mfaLoading || mfaCode.length !== 6} className="btn-primary btn-md w-full">
+            <button type="submit" disabled={mfaLoading || mfaCode.length !== 6}
+              className="w-full flex items-center justify-center gap-2 bg-white text-orange-500 font-semibold text-sm py-2.5 rounded-xl hover:bg-white/90 transition disabled:opacity-60">
               {mfaLoading && <Loader2 size={14} className="animate-spin" />}
               {mfaLoading ? "Проверка..." : "Подтвердить"}
             </button>
             <button type="button" onClick={() => { setMfaStep(false); setMfaCode(""); setError(""); }}
-              className="btn-secondary btn-md w-full">
+              className="w-full text-sm text-white/70 hover:text-white py-2 transition">
               Назад
             </button>
           </form>
