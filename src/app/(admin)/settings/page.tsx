@@ -21,9 +21,12 @@ export default function SettingsPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase.auth.mfa.listFactors();
-    setFactors(data?.totp ?? []);
-    setLoading(false);
+    try {
+      const { data } = await supabase.auth.mfa.listFactors();
+      setFactors(data?.totp ?? []);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -55,10 +58,7 @@ export default function SettingsPage() {
       return;
     }
     toast.success("MFA успешно подключена!");
-    setEnrolling(false);
-    setQrCode(""); setSecret(""); setCode("");
-    await load();
-    setVerifying(false);
+    globalThis.location.reload();
   }
 
   async function unenroll(id: string) {
