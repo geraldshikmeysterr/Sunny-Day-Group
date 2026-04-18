@@ -267,7 +267,8 @@ export default function CarouselPage() {
     let imageUrl = modal.editing?.image_url ?? null;
     if (photoFile) {
       try {
-        const ext = photoFile.name.split(".").pop();
+        const extMap: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
+        const ext = extMap[photoFile.type] ?? "jpg";
         const path = `carousel/${Date.now()}.${ext}`;
         const { error } = await supabase.storage.from("carousel-images").upload(path, photoFile, { upsert: true });
         if (error) throw error;

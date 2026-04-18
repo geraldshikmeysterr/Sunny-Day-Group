@@ -144,35 +144,23 @@ export default function CitiesPage() {
         }
         const oldOp = operators[editModal.id];
         const token = await getToken();
-        // Удаляем старого через Edge Function
+        // Удаляем из Auth сначала — если упадёт, DB-запись останется целой
         if (oldOp) {
-          await supabase.from("operators").delete().eq("id", oldOp.id);
           await callEdgeFunction("delete-operator", { user_id: oldOp.id }, token).catch(() => {});
+          await supabase.from("operators").delete().eq("id", oldOp.id);
         }
         // Создаём нового оператора через Edge Function (имеет service role)
-        const createRes = await fetch(
-          `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-operator`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${token}`,
-              "apikey": process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-            },
-            body: JSON.stringify({
-              city_name: editModal.name,
-              city_region: editModal.region,
-              operator_email: editForm.op_email,
-              operator_password: editForm.op_password,
-              existing_city_id: editModal.id,
-            }),
-          }
-        );
-        if (createRes.ok) {
+        try {
+          await callEdgeFunction("create-operator", {
+            city_name: editModal.name,
+            city_region: editModal.region,
+            operator_email: editForm.op_email,
+            operator_password: editForm.op_password,
+            existing_city_id: editModal.id,
+          }, token);
           toast.success("Оператор сменён");
-        } else {
-          const err = await createRes.json();
-          toast.error(err.error ?? "Ошибка создания оператора");
+        } catch (e: any) {
+          toast.error(e.message ?? "Ошибка создания оператора");
         }
       }
 
@@ -190,10 +178,9 @@ export default function CitiesPage() {
     try {
       const token = await getToken();
       if (op) {
-        // Удаляем из таблицы operators
-        await supabase.from("operators").delete().eq("id", op.id);
-        // Удаляем из Auth через Edge Function (с service role)
+        // Удаляем из Auth сначала — если упадёт, DB-запись останется целой
         await callEdgeFunction("delete-operator", { user_id: op.id }, token);
+        await supabase.from("operators").delete().eq("id", op.id);
       }
       await supabase.from("cities").delete().eq("id", city.id);
       setCities(p => p.filter(c => c.id !== city.id));

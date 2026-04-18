@@ -341,7 +341,8 @@ export default function MenuEditorPage() {
     let imageUrl = form.image_url || null;
     if (photoFile) {
       try {
-        const ext = photoFile.name.split(".").pop();
+        const extMap: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
+        const ext = extMap[photoFile.type] ?? "jpg";
         const path = `menu/${Date.now()}.${ext}`;
         const { error } = await supabase.storage.from("dish-photos").upload(path, photoFile, { upsert: true });
         if (error) throw error;
