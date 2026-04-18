@@ -17,7 +17,10 @@ export default function SettingsPage() {
   const [secret, setSecret] = useState("");
   const [code, setCode] = useState("");
   const [verifying, setVerifying] = useState(false);
-  const [unenrolling, setUnenrolling] = useState<string | null>(null);
+
+  const [unenrollConfirm, setUnenrollConfirm] = useState<{ factorId: string; challengeId: string } | null>(null);
+  const [unenrollCode, setUnenrollCode] = useState("");
+  const [unenrolling, setUnenrolling] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -61,13 +64,32 @@ export default function SettingsPage() {
     globalThis.location.reload();
   }
 
-  async function unenroll(id: string) {
-    if (!confirm("Отключить двухфакторную аутентификацию?")) return;
-    setUnenrolling(id);
-    const { error } = await supabase.auth.mfa.unenroll({ factorId: id });
-    if (error) toast.error(error.message);
-    else { toast.success("MFA отключена"); await load(); }
-    setUnenrolling(null);
+  async function startUnenroll(id: string) {
+    const { data, error } = await supabase.auth.mfa.challenge({ factorId: id });
+    if (error || !data) { toast.error("Ошибка: " + error?.message); return; }
+    setUnenrollConfirm({ factorId: id, challengeId: data.id });
+    setUnenrollCode("");
+  }
+
+  async function confirmUnenroll() {
+    if (!unenrollConfirm || unenrollCode.length !== 6) return;
+    setUnenrolling(true);
+    const { error: verifyErr } = await supabase.auth.mfa.verify({
+      factorId: unenrollConfirm.factorId,
+      challengeId: unenrollConfirm.challengeId,
+      code: unenrollCode,
+    });
+    if (verifyErr) {
+      toast.error("Неверный код");
+      setUnenrolling(false);
+      return;
+    }
+    const { error } = await supabase.auth.mfa.unenroll({ factorId: unenrollConfirm.factorId });
+    if (error) { toast.error(error.message); setUnenrolling(false); return; }
+    toast.success("MFA отключена");
+    setUnenrollConfirm(null);
+    setUnenrolling(false);
+    await load();
   }
 
   const verifiedFactors = factors.filter(f => f.status === "verified");
@@ -79,10 +101,9 @@ export default function SettingsPage() {
         <p className="text-sm text-neutral-500 mt-0.5">Управление безопасностью аккаунта</p>
       </div>
 
-      {/* MFA */}
       <div className="card p-5 space-y-4">
         <div>
-          <h2 className="text-base font-semibold text-neutral-900">Двухфакторная аутентификация</h2>
+          <h2 className="text-sm text-neutral-900">Двухфакторная аутентификация</h2>
           <p className="text-xs text-neutral-400 mt-0.5">TOTP через Google Authenticator, Authy или 1Password</p>
         </div>
 
@@ -91,24 +112,46 @@ export default function SettingsPage() {
         ) : verifiedFactors.length > 0 ? (
           <div className="space-y-2">
             {verifiedFactors.map(f => (
-              <div key={f.id} className="flex items-center justify-between p-3 bg-success-50 rounded-xl">
-                <div className="flex items-center gap-2">
-                  <ShieldCheck size={18} className="text-success-600 shrink-0" />
-                  <div>
-                    <p className="text-sm font-medium text-success-800">TOTP подключён</p>
-                    <p className="text-xs text-success-600">{f.friendly_name ?? "Authenticator"}</p>
-                  </div>
+              <div key={f.id} className="flex items-start gap-3 p-4 bg-neutral-50 rounded-xl">
+                <ShieldCheck size={20} className="text-neutral-600 mt-0.5 shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-neutral-700">Подключена</p>
+                  <p className="text-xs text-neutral-400 mt-0.5">{f.friendly_name ?? "Authenticator"}</p>
                 </div>
-                <button
-                  onClick={() => unenroll(f.id)}
-                  disabled={unenrolling === f.id}
-                  className="btn-danger btn-sm text-xs flex items-center gap-1"
-                >
-                  {unenrolling === f.id
-                    ? <Loader2 size={12} className="animate-spin" />
-                    : <ShieldOff size={12} />}
-                  Отключить
-                </button>
+                {unenrollConfirm?.factorId === f.id ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      value={unenrollCode}
+                      onChange={e => setUnenrollCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                      className="input text-center font-mono w-28 text-sm"
+                      placeholder="000000"
+                      maxLength={6}
+                      inputMode="numeric"
+                      autoFocus
+                    />
+                    <button
+                      onClick={confirmUnenroll}
+                      disabled={unenrolling || unenrollCode.length !== 6}
+                      className="btn-danger btn-sm flex items-center gap-1"
+                    >
+                      {unenrolling ? <Loader2 size={12} className="animate-spin" /> : <ShieldOff size={12} />}
+                      Подтвердить
+                    </button>
+                    <button
+                      onClick={() => setUnenrollConfirm(null)}
+                      className="btn-secondary btn-sm"
+                    >
+                      Отмена
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => startUnenroll(f.id)}
+                    className="btn-danger btn-sm text-xs flex items-center gap-1 shrink-0"
+                  >
+                    <ShieldOff size={12} /> Отключить
+                  </button>
+                )}
               </div>
             ))}
           </div>
