@@ -300,6 +300,65 @@ CREATE POLICY "addresses_own" ON addresses
 
 
 -- =============================================================================
+-- TABLE: audit_log
+-- Immutable record of all write operations by admin/operator users.
+-- Populated via per-table triggers; only admins can read; nobody can UPDATE/DELETE.
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS audit_log (
+  id          uuid        DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id     uuid        REFERENCES auth.users ON DELETE SET NULL,
+  action      text        NOT NULL,   -- 'INSERT' | 'UPDATE' | 'DELETE'
+  table_name  text        NOT NULL,
+  record_id   uuid,
+  old_data    jsonb,
+  new_data    jsonb,
+  created_at  timestamptz DEFAULT now() NOT NULL
+);
+
+ALTER TABLE audit_log ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "audit_log_select_admin" ON audit_log;
+CREATE POLICY "audit_log_select_admin" ON audit_log FOR SELECT USING (is_admin());
+
+-- Triggers write via SECURITY DEFINER function — no direct INSERT/UPDATE/DELETE for users.
+DROP POLICY IF EXISTS "audit_log_insert_deny" ON audit_log;
+CREATE POLICY "audit_log_insert_deny" ON audit_log FOR INSERT WITH CHECK (false);
+
+-- Helper: called by every trigger below (SECURITY DEFINER bypasses RLS)
+CREATE OR REPLACE FUNCTION audit_trigger_fn()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  INSERT INTO audit_log (user_id, action, table_name, record_id, old_data, new_data)
+  VALUES (
+    auth.uid(),
+    TG_OP,
+    TG_TABLE_NAME,
+    CASE TG_OP WHEN 'DELETE' THEN (OLD.id)::uuid ELSE (NEW.id)::uuid END,
+    CASE TG_OP WHEN 'INSERT' THEN NULL ELSE to_jsonb(OLD) END,
+    CASE TG_OP WHEN 'DELETE' THEN NULL ELSE to_jsonb(NEW) END
+  );
+  RETURN NULL;
+END;
+$$;
+
+-- Attach audit trigger to tables that matter for security/compliance
+DO $$
+DECLARE
+  t text;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['orders','menu_items','categories','carousel_cards','promocodes','cities','operators','admins','restaurants'] LOOP
+    EXECUTE format('
+      DROP TRIGGER IF EXISTS audit_%I ON %I;
+      CREATE TRIGGER audit_%I
+        AFTER INSERT OR UPDATE OR DELETE ON %I
+        FOR EACH ROW EXECUTE FUNCTION audit_trigger_fn();
+    ', t, t, t, t);
+  END LOOP;
+END;
+$$;
+
+
+-- =============================================================================
 -- VERIFY: List tables with RLS disabled (run this to check after applying)
 -- SELECT tablename FROM pg_tables
 -- WHERE schemaname = 'public'

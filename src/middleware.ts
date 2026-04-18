@@ -20,11 +20,14 @@ function buildCsp(nonce: string): string {
     "img-src 'self' data: blob: https://supabase.shilmeyster.ru",
     "connect-src 'self' https://supabase.shilmeyster.ru wss://supabase.shilmeyster.ru",
     "frame-ancestors 'none'",
+    "object-src 'none'",
+    "base-uri 'self'",
   ].join("; ");
 }
 
 function applySecurityHeaders(res: NextResponse, csp: string): void {
   res.headers.set("Content-Security-Policy", csp);
+  res.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
   res.headers.set("X-Frame-Options", "DENY");
   res.headers.set("X-Content-Type-Options", "nosniff");
   res.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
