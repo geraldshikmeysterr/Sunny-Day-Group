@@ -49,10 +49,7 @@ export default function SettingsPage() {
         }).catch(() => {});
       }
     }
-    const { data, error } = await supabase.auth.mfa.enroll({
-      factorType: "totp",
-      friendlyName: "Authenticator",
-    });
+    const { data, error } = await supabase.auth.mfa.enroll({ factorType: "totp" });
     if (error || !data) {
       toast.error("Ошибка: " + error?.message);
       setEnrolling(false);
