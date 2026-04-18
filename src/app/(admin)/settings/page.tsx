@@ -75,24 +75,21 @@ export default function SettingsPage() {
     if (!unenrollConfirm || unenrollCode.length !== 6) return;
     setUnenrolling(true);
     try {
-      const { error: verifyErr } = await supabase.auth.mfa.verify({
+      // verify возвращает сессию с новым токеном AAL2 прямо в ответе —
+      // используем его напрямую, не вызывая getSession() (он тоже ждёт lock).
+      const { data: verifyData, error: verifyErr } = await supabase.auth.mfa.verify({
         factorId: unenrollConfirm.factorId,
         challengeId: unenrollConfirm.challengeId,
         code: unenrollCode,
       });
-      if (verifyErr) { toast.error("Неверный код"); return; }
-
-      // После verify клиент удерживает lock на обновление сессии.
-      // Делаем DELETE напрямую через fetch, чтобы не ждать lock.
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { toast.error("Сессия истекла"); return; }
+      if (verifyErr || !verifyData?.access_token) { toast.error("Неверный код"); return; }
 
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/factors/${unenrollConfirm.factorId}`,
         {
           method: "DELETE",
           headers: {
-            Authorization: `Bearer ${session.access_token}`,
+            Authorization: `Bearer ${verifyData.access_token}`,
             apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
           },
         }
