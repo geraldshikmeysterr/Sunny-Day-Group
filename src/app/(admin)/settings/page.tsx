@@ -127,7 +127,7 @@ export default function SettingsPage() {
 
       <div className="card p-5 space-y-4">
         <div>
-          <h2 className="text-sm text-neutral-900">Двухфакторная аутентификация</h2>
+          <h2 className="text-sm font-semibold text-neutral-700">Двухфакторная аутентификация</h2>
           <p className="text-xs text-neutral-400 mt-0.5">TOTP через Google Authenticator, Authy или 1Password</p>
         </div>
 
@@ -220,7 +220,7 @@ export default function SettingsPage() {
                 <input
                   value={code}
                   onChange={e => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                  className="input text-center text-xl font-mono tracking-[0.4em] w-40"
+                  className="input text-center text-xl font-mono tracking-[0.4em] pl-[0.4em] w-40"
                   placeholder="000000"
                   maxLength={6}
                   autoComplete="one-time-code"
