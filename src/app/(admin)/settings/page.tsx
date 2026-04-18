@@ -87,9 +87,7 @@ export default function SettingsPage() {
     const { error } = await supabase.auth.mfa.unenroll({ factorId: unenrollConfirm.factorId });
     if (error) { toast.error(error.message); setUnenrolling(false); return; }
     toast.success("MFA отключена");
-    setUnenrollConfirm(null);
-    setUnenrolling(false);
-    await load();
+    globalThis.location.reload();
   }
 
   const verifiedFactors = factors.filter(f => f.status === "verified");
