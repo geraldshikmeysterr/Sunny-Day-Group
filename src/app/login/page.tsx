@@ -58,86 +58,63 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex">
-      {/* Левая панель */}
-      <div className="hidden lg:flex lg:w-[420px] xl:w-[480px] flex-col justify-between p-10 shrink-0"
-        style={{ background: "linear-gradient(160deg, #F57300 0%, #C85500 100%)" }}>
-        <img src="/logo.png" alt="Солнечный день" className="h-10 object-contain object-left" />
-        <div>
-          <p className="text-white/60 text-sm font-medium uppercase tracking-widest mb-3">Панель управления</p>
-          <p className="text-white text-3xl font-bold leading-snug">
-            Управляй заказами,<br />меню и городами<br />в одном месте
+    <div className="min-h-screen flex items-center justify-center px-4"
+      style={{ background: "linear-gradient(135deg, #F57300 0%, #C85500 100%)" }}>
+      <div className="card w-full max-w-sm p-8">
+
+        <div className="text-center mb-8">
+          <img src="/logo.png" alt="Солнечный день" className="h-10 object-contain mx-auto mb-5" />
+          <p className="text-sm text-neutral-500">
+            {mfaStep ? "Двухфакторная аутентификация" : "Панель управления"}
           </p>
         </div>
-        <p className="text-white/40 text-xs">© 2025 Солнечный день</p>
-      </div>
 
-      {/* Правая панель */}
-      <div className="flex-1 flex items-center justify-center bg-neutral-100 px-4 py-12">
-        <div className="w-full max-w-sm">
-          {/* Логотип на мобильных */}
-          <div className="flex justify-center mb-8 lg:hidden">
-            <div className="w-14 h-14 rounded-2xl flex items-center justify-center"
-              style={{ background: "linear-gradient(135deg, #F57300, #E06500)" }}>
-              <img src="/logo.png" alt="Солнечный день" className="h-8 w-8 object-contain" />
+        {!mfaStep ? (
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <label className="label">Email</label>
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+                placeholder="operator@city.ru" required className="input" />
             </div>
-          </div>
-
-          <div className="mb-8">
-            <h1 className="text-2xl font-bold text-neutral-900">
-              {mfaStep ? "Двухфакторная аутентификация" : "Добро пожаловать"}
-            </h1>
-            <p className="text-sm text-neutral-500 mt-1">
-              {mfaStep ? "Введи код из приложения-аутентификатора" : "Войди в панель управления"}
-            </p>
-          </div>
-
-          {!mfaStep ? (
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div>
-                <label className="label">Email</label>
-                <input type="email" value={email} onChange={e => setEmail(e.target.value)}
-                  placeholder="operator@city.ru" required className="input" />
-              </div>
-              <div>
-                <label className="label">Пароль</label>
-                <input type="password" value={password} onChange={e => setPassword(e.target.value)}
-                  placeholder="••••••••" required className="input" />
-              </div>
-              {error && (
-                <div className="text-sm text-danger-600 bg-danger-50 px-3 py-2.5 rounded-lg">{error}</div>
-              )}
-              <button type="submit" disabled={loading} className="btn-primary btn-md w-full mt-2">
-                {loading && <Loader2 size={14} className="animate-spin" />}
-                {loading ? "Вход..." : "Войти"}
-              </button>
-            </form>
-          ) : (
-            <form onSubmit={handleMfa} className="space-y-4">
-              <input
-                value={mfaCode}
-                onChange={e => setMfaCode(e.target.value.replaceAll(/\D/g, "").slice(0, 6))}
-                className="input text-center text-2xl font-mono tracking-[0.5em] pl-[0.5em] w-full"
-                placeholder="000000"
-                maxLength={6}
-                autoComplete="one-time-code"
-                inputMode="numeric"
-                autoFocus
-              />
-              {error && (
-                <div className="text-sm text-danger-600 bg-danger-50 px-3 py-2.5 rounded-lg">{error}</div>
-              )}
-              <button type="submit" disabled={mfaLoading || mfaCode.length !== 6} className="btn-primary btn-md w-full">
-                {mfaLoading && <Loader2 size={14} className="animate-spin" />}
-                {mfaLoading ? "Проверка..." : "Подтвердить"}
-              </button>
-              <button type="button" onClick={() => { setMfaStep(false); setMfaCode(""); setError(""); }}
-                className="btn-secondary btn-md w-full">
-                Назад
-              </button>
-            </form>
-          )}
-        </div>
+            <div>
+              <label className="label">Пароль</label>
+              <input type="password" value={password} onChange={e => setPassword(e.target.value)}
+                placeholder="••••••••" required className="input" />
+            </div>
+            {error && (
+              <div className="text-sm text-danger-600 bg-danger-50 px-3 py-2.5 rounded-lg">{error}</div>
+            )}
+            <button type="submit" disabled={loading} className="btn-primary btn-md w-full mt-2">
+              {loading && <Loader2 size={14} className="animate-spin" />}
+              {loading ? "Вход..." : "Войти"}
+            </button>
+          </form>
+        ) : (
+          <form onSubmit={handleMfa} className="space-y-4">
+            <p className="text-xs text-neutral-400 text-center">Введи код из приложения-аутентификатора</p>
+            <input
+              value={mfaCode}
+              onChange={e => setMfaCode(e.target.value.replaceAll(/\D/g, "").slice(0, 6))}
+              className="input text-center text-2xl font-mono tracking-[0.5em] pl-[0.5em] w-full"
+              placeholder="000000"
+              maxLength={6}
+              autoComplete="one-time-code"
+              inputMode="numeric"
+              autoFocus
+            />
+            {error && (
+              <div className="text-sm text-danger-600 bg-danger-50 px-3 py-2.5 rounded-lg">{error}</div>
+            )}
+            <button type="submit" disabled={mfaLoading || mfaCode.length !== 6} className="btn-primary btn-md w-full">
+              {mfaLoading && <Loader2 size={14} className="animate-spin" />}
+              {mfaLoading ? "Проверка..." : "Подтвердить"}
+            </button>
+            <button type="button" onClick={() => { setMfaStep(false); setMfaCode(""); setError(""); }}
+              className="btn-secondary btn-md w-full">
+              Назад
+            </button>
+          </form>
+        )}
       </div>
     </div>
   );
