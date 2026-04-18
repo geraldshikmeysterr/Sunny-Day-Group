@@ -60,7 +60,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-white px-4">
       <div className="w-full max-w-sm rounded-2xl p-8 shadow-xl"
-        style={{ background: "linear-gradient(180deg, #F57300 0%, #E06500 100%)" }}>
+        style={{ background: "#F57300" }}>
 
         <div className="text-center mb-8">
           <img src="/logo.png" alt="Солнечный день" className="h-12 object-contain mx-auto mb-3" />

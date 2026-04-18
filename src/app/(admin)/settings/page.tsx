@@ -63,12 +63,21 @@ export default function SettingsPage() {
   async function verify() {
     if (code.length !== 6) { toast.error("Введите 6-значный код"); return; }
     setVerifying(true);
-    const { error } = await supabase.auth.mfa.challengeAndVerify({ factorId, code });
-    if (error) {
-      toast.error("Неверный код");
-      setVerifying(false);
-      return;
-    }
+    // challengeAndVerify() из SDK дедлочится с onAuthStateChange — используем raw fetch
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+    if (!token) { toast.error("Сессия истекла"); setVerifying(false); return; }
+    const challengeRes = await fetch(
+      `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/factors/${factorId}/challenge`,
+      { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY! }, body: "{}" }
+    );
+    if (!challengeRes.ok) { toast.error("Ошибка"); setVerifying(false); return; }
+    const { id: challengeId } = await challengeRes.json();
+    const verifyRes = await fetch(
+      `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/factors/${factorId}/verify`,
+      { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY! }, body: JSON.stringify({ challenge_id: challengeId, code }) }
+    );
+    if (!verifyRes.ok) { toast.error("Неверный код"); setVerifying(false); return; }
     toast.success("MFA успешно подключена!");
     globalThis.location.reload();
   }
