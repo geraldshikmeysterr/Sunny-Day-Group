@@ -37,6 +37,9 @@ export default function SettingsPage() {
   async function startEnroll() {
     setEnrolling(true);
     setCode("");
+    const { data: existing } = await supabase.auth.mfa.listFactors();
+    const pending = (existing?.totp ?? []).filter(f => f.status !== "verified");
+    for (const f of pending) await supabase.auth.mfa.unenroll({ factorId: f.id }).catch(() => {});
     const { data, error } = await supabase.auth.mfa.enroll({
       factorType: "totp",
       friendlyName: "Authenticator",
