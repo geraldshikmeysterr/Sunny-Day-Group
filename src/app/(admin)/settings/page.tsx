@@ -18,7 +18,7 @@ export default function SettingsPage() {
   const [code, setCode] = useState("");
   const [verifying, setVerifying] = useState(false);
 
-  const [unenrollConfirm, setUnenrollConfirm] = useState<{ factorId: string; challengeId: string } | null>(null);
+  const [unenrollConfirm, setUnenrollConfirm] = useState<{ factorId: string; challengeId: string; token: string } | null>(null);
   const [unenrollCode, setUnenrollCode] = useState("");
   const [unenrolling, setUnenrolling] = useState(false);
 
@@ -65,9 +65,12 @@ export default function SettingsPage() {
   }
 
   async function startUnenroll(id: string) {
+    const { data: session } = await supabase.auth.getSession();
+    const token = session?.session?.access_token;
+    if (!token) { toast.error("Сессия истекла, войдите заново"); return; }
     const { data, error } = await supabase.auth.mfa.challenge({ factorId: id });
     if (error || !data) { toast.error("Ошибка: " + error?.message); return; }
-    setUnenrollConfirm({ factorId: id, challengeId: data.id });
+    setUnenrollConfirm({ factorId: id, challengeId: data.id, token });
     setUnenrollCode("");
   }
 
@@ -75,16 +78,23 @@ export default function SettingsPage() {
     if (!unenrollConfirm || unenrollCode.length !== 6) return;
     setUnenrolling(true);
     try {
-      // verify возвращает сессию с новым токеном AAL2 прямо в ответе —
-      // используем его напрямую, не вызывая getSession() (он тоже ждёт lock).
-      const { data: verifyData, error: verifyErr } = await supabase.auth.mfa.verify({
-        factorId: unenrollConfirm.factorId,
-        challengeId: unenrollConfirm.challengeId,
-        code: unenrollCode,
-      });
-      if (verifyErr || !verifyData?.access_token) { toast.error("Неверный код"); return; }
+      // supabase.auth.mfa.verify() дедлочится с onAuthStateChange — используем raw fetch
+      const verifyRes = await fetch(
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/factors/${unenrollConfirm.factorId}/verify`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${unenrollConfirm.token}`,
+            apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+          },
+          body: JSON.stringify({ challenge_id: unenrollConfirm.challengeId, code: unenrollCode }),
+        }
+      );
+      if (!verifyRes.ok) { toast.error("Неверный код"); return; }
+      const verifyData = await verifyRes.json();
 
-      const res = await fetch(
+      const deleteRes = await fetch(
         `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/factors/${unenrollConfirm.factorId}`,
         {
           method: "DELETE",
@@ -94,8 +104,8 @@ export default function SettingsPage() {
           },
         }
       );
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
+      if (!deleteRes.ok) {
+        const body = await deleteRes.json().catch(() => ({}));
         toast.error(body.message ?? "Ошибка при отключении");
         return;
       }
