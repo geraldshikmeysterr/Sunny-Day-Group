@@ -1,7 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { useAdmin } from "@/components/layout/AdminContext";
 import { Shield, ShieldCheck, ShieldOff, Loader2, Key } from "lucide-react";
 import { toast } from "sonner";
 
@@ -9,8 +8,6 @@ type Factor = { id: string; factor_type: string; status: string; friendly_name?:
 
 export default function SettingsPage() {
   const supabase = createClient();
-  const { isAdmin } = useAdmin();
-  const [email, setEmail] = useState("");
   const [factors, setFactors] = useState<Factor[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -24,8 +21,6 @@ export default function SettingsPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    setEmail(user?.email ?? "");
     const { data } = await supabase.auth.mfa.listFactors();
     setFactors(data?.totp ?? []);
     setLoading(false);
@@ -81,27 +76,13 @@ export default function SettingsPage() {
     <div className="p-6 max-w-2xl mx-auto space-y-5">
       <div>
         <h1 className="text-3xl font-bold text-neutral-900">Настройки</h1>
-        <p className="text-sm text-neutral-500 mt-0.5">Управление аккаунтом и безопасностью</p>
-      </div>
-
-      {/* Аккаунт */}
-      <div className="card p-5 space-y-3">
-        <h2 className="text-sm font-semibold text-neutral-500 uppercase tracking-wide">Аккаунт</h2>
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-brand-100 flex items-center justify-center shrink-0">
-            <span className="text-brand-600 font-bold text-sm">{email[0]?.toUpperCase()}</span>
-          </div>
-          <div>
-            <p className="font-medium text-neutral-900">{email}</p>
-            <p className="text-xs text-neutral-400">{isAdmin ? "Администратор" : "Оператор"}</p>
-          </div>
-        </div>
+        <p className="text-sm text-neutral-500 mt-0.5">Управление безопасностью аккаунта</p>
       </div>
 
       {/* MFA */}
       <div className="card p-5 space-y-4">
         <div>
-          <h2 className="text-sm font-semibold text-neutral-500 uppercase tracking-wide">Двухфакторная аутентификация</h2>
+          <h2 className="text-base font-semibold text-neutral-900">Двухфакторная аутентификация</h2>
           <p className="text-xs text-neutral-400 mt-0.5">TOTP через Google Authenticator, Authy или 1Password</p>
         </div>
 
@@ -186,7 +167,10 @@ export default function SettingsPage() {
                   {verifying ? <Loader2 size={14} className="animate-spin" /> : "Подтвердить"}
                 </button>
                 <button
-                  onClick={() => { setEnrolling(false); setQrCode(""); setSecret(""); setCode(""); }}
+                  onClick={async () => {
+                    if (factorId) await supabase.auth.mfa.unenroll({ factorId }).catch(() => {});
+                    setEnrolling(false); setQrCode(""); setSecret(""); setCode(""); setFactorId("");
+                  }}
                   className="btn-secondary btn-md"
                 >
                   Отмена
