@@ -31,7 +31,7 @@ export default function CompletedOrdersPage() {
     try {
       let q = supabase.from("orders")
         .select("id,status,total_amount,delivery_fee,created_at,payment_status,profiles(phone,first_name),order_items(item_name,quantity),cities(name)", { count: "exact" })
-        .in("status", ["completed","cancelled"])
+        .in("status", ["delivered","cancelled"])
         .range(page*PAGE_SIZE,(page+1)*PAGE_SIZE-1)
         .order("created_at",{ascending:false});
       if (!isAdmin && cityId) q = q.eq("city_id", cityId);
@@ -48,7 +48,7 @@ export default function CompletedOrdersPage() {
   const filtered = orders.filter(o => !search || o.profiles?.phone?.includes(search) || o.id.includes(search));
   const totalPages = Math.ceil(total/PAGE_SIZE);
   const cityOptions = [{ value: "all", label: "Все города" }, ...cities.map(c=>({value:c.id,label:c.name}))];
-  const statusOptions = [{ value:"all", label:"Все статусы" }, {value:"completed",label:"Выполнен"}, {value:"cancelled",label:"Отменён"}];
+  const statusOptions = [{ value:"all", label:"Все статусы" }, {value:"delivered",label:"Доставлен"}, {value:"cancelled",label:"Отменён"}];
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-5">

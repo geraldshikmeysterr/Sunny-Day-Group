@@ -9,7 +9,7 @@ import { CustomSelect } from "@/components/CustomSelect";
 import type { OrderStatus } from "@/lib/utils";
 
 const PAGE_SIZE = 25;
-const ACTIVE: OrderStatus[] = ["new", "preparing", "on_the_way", "ready_for_pickup"];
+const ACTIVE: OrderStatus[] = ["new", "confirmed", "preparing", "delivering"];
 
 export default function ActiveOrdersPage() {
   const { isAdmin, cityId } = useAdmin() as any;
