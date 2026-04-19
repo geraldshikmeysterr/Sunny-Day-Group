@@ -58,19 +58,12 @@ export default function ActiveOrdersPage() {
   async function advance(orderId: string, next: OrderStatus) {
     setUpdating(orderId);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/update-order-status`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ order_id: orderId, status: next }),
-      });
-      if (!res.ok) throw new Error("Ошибка обновления статуса");
+      const { error } = await supabase.from("orders").update({ status: next }).eq("id", orderId);
+      if (error) throw error;
       toast.success(`→ ${ORDER_STATUS_LABELS[next]}`);
       fetchOrders();
-    } catch (err) {
-      // No direct DB fallback — Edge Function enforces city-scoped auth
+    } catch {
       toast.error("Не удалось обновить статус заказа");
-      console.error("advance order error:", err);
     }
     setUpdating(null);
   }
