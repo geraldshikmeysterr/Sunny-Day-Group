@@ -123,7 +123,7 @@ export default function LoginPage() {
               value={mfaCode}
               onChange={e => setMfaCode(e.target.value.replaceAll(/\D/g, "").slice(0, 6))}
               className="w-full py-2.5 rounded-xl text-center text-2xl font-mono bg-white/15 text-white placeholder-white/40 border border-white/25 outline-none focus:bg-white/25 focus:border-white/50 transition"
-              style={{ letterSpacing: "0.5em", paddingLeft: "1em" }}
+              style={{ letterSpacing: "0.5em", paddingLeft: "0.75em" }}
               placeholder="000000"
               maxLength={6}
               autoComplete="one-time-code"
