@@ -66,7 +66,14 @@ export async function middleware(request: NextRequest) {
   const isLogin = path.startsWith("/login");
 
   if (!user && !isLogin) return NextResponse.redirect(new URL("/login", request.url));
-  if (user && isLogin) return NextResponse.redirect(new URL("/active-orders", request.url));
+  if (user && isLogin) {
+    // Only redirect if MFA is not pending (AAL1 == AAL2 means no MFA required or already completed)
+    const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (!aal || aal.currentLevel === aal.nextLevel) {
+      return NextResponse.redirect(new URL("/active-orders", request.url));
+    }
+    // MFA required but not yet completed — stay on login page
+  }
 
   // Enforce superadmin-only route access at the server level
   if (user && ADMIN_ONLY_ROUTES.some(r => path === r || path.startsWith(r + "/"))) {
