@@ -17,8 +17,9 @@ export default function LoginPage() {
   const [mfaStep, setMfaStep] = useState(false);
   const [mfaLoading, setMfaLoading] = useState(false);
 
-  // Restore MFA step if page is refreshed during MFA flow
+  // Restore MFA step only if user went through password step in this browser session
   useEffect(() => {
+    if (!sessionStorage.getItem("mfa_in_progress")) return;
     async function checkPendingMfa() {
       const supabase = createClient();
       const { data: { session } } = await supabase.auth.getSession();
@@ -51,6 +52,7 @@ export default function LoginPage() {
       if (totp) {
         const { data: challenge } = await supabase.auth.mfa.challenge({ factorId: totp.id });
         if (challenge) {
+          sessionStorage.setItem("mfa_in_progress", "true");
           setMfaFactorId(totp.id);
           setMfaChallengeId(challenge.id);
           setMfaStep(true);
@@ -74,6 +76,7 @@ export default function LoginPage() {
       code: mfaCode,
     });
     if (verifyError) { setError("Неверный код"); setMfaLoading(false); return; }
+    sessionStorage.removeItem("mfa_in_progress");
     router.push("/active-orders"); router.refresh();
   }
 
@@ -120,7 +123,7 @@ export default function LoginPage() {
               value={mfaCode}
               onChange={e => setMfaCode(e.target.value.replaceAll(/\D/g, "").slice(0, 6))}
               className="w-full py-2.5 rounded-xl text-center text-2xl font-mono bg-white/15 text-white placeholder-white/40 border border-white/25 outline-none focus:bg-white/25 focus:border-white/50 transition"
-              style={{ letterSpacing: "0.5em", paddingLeft: "0.5em" }}
+              style={{ letterSpacing: "0.5em", paddingLeft: "1em" }}
               placeholder="000000"
               maxLength={6}
               autoComplete="one-time-code"
@@ -135,7 +138,7 @@ export default function LoginPage() {
               {mfaLoading && <Loader2 size={14} className="animate-spin" />}
               {mfaLoading ? "Проверка..." : "Подтвердить"}
             </button>
-            <button type="button" onClick={() => { setMfaStep(false); setMfaCode(""); setError(""); }}
+            <button type="button" onClick={() => { sessionStorage.removeItem("mfa_in_progress"); setMfaStep(false); setMfaCode(""); setError(""); }}
               className="w-full text-sm text-white/70 hover:text-white py-2 transition">
               Назад
             </button>
