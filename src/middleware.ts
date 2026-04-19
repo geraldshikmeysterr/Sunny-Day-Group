@@ -11,10 +11,10 @@ const ADMIN_ONLY_ROUTES = [
   "/users",
 ];
 
-function buildCsp(): string {
+function buildCsp(nonce: string): string {
   return [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline'",
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
     "img-src 'self' data: blob: https://supabase.shilmeyster.ru",
@@ -35,9 +35,14 @@ function applySecurityHeaders(res: NextResponse, csp: string): void {
 }
 
 export async function middleware(request: NextRequest) {
-  const csp = buildCsp();
+  const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
+  const csp = buildCsp(nonce);
 
-  let response = NextResponse.next();
+  // Forward nonce to Next.js so it applies it to its own inline scripts
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-nonce", nonce);
+
+  let response = NextResponse.next({ request: { headers: requestHeaders } });
   applySecurityHeaders(response, csp);
 
   const supabase = createServerClient(
@@ -48,7 +53,7 @@ export async function middleware(request: NextRequest) {
         getAll() { return request.cookies.getAll(); },
         setAll(cookiesToSet: { name: string; value: string; options?: any }[]) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-          response = NextResponse.next();
+          response = NextResponse.next({ request: { headers: requestHeaders } });
           applySecurityHeaders(response, csp);
           cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
         },

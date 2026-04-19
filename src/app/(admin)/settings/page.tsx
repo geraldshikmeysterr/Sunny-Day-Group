@@ -253,7 +253,17 @@ export default function SettingsPage() {
                 </button>
                 <button
                   onClick={async () => {
-                    if (factorId) await supabase.auth.mfa.unenroll({ factorId }).catch(() => {});
+                    if (factorId) {
+                      // mfa.unenroll() deadlocks with onAuthStateChange — use raw fetch
+                      const { data: s } = await supabase.auth.getSession();
+                      const token = s?.session?.access_token;
+                      if (token) {
+                        await fetch(
+                          `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/factors/${factorId}`,
+                          { method: "DELETE", headers: { Authorization: `Bearer ${token}`, apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY! } }
+                        ).catch(() => {});
+                      }
+                    }
                     setEnrolling(false); setQrCode(""); setSecret(""); setCode(""); setFactorId("");
                   }}
                   className="btn-secondary btn-md"

@@ -55,7 +55,7 @@ Two roles stored in Supabase DB:
 | `src/lib/supabase/server.ts` | Server Supabase client with cookies (for server components / middleware) |
 | `src/lib/utils.ts` | `cn()`, `formatPrice()`, `OrderStatus` type, status label/color mappings |
 | `src/lib/validateImageFile.ts` | Magic-byte MIME validation for uploads (JPEG/PNG/WebP, max 5 MB) |
-| `src/middleware.ts` | Auth check, CSP headers (`unsafe-inline`), superadmin-only route enforcement |
+| `src/middleware.ts` | Auth check, nonce-based CSP (`strict-dynamic`), superadmin-only route enforcement |
 | `src/components/layout/AdminContext.tsx` | Role + cityId context provider |
 | `src/components/layout/Sidebar.tsx` | Nav with role-based link filtering |
 | `tailwind.config.js` | Custom brand colors, animations, shadows |
@@ -115,7 +115,8 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 ## Security Model
 
 ### Middleware (`src/middleware.ts`)
-- Sets CSP header with `'unsafe-inline'` for scripts/styles (nonce-based CSP was reverted — incompatible with Next.js static prerendering: prerendered HTML has no nonces)
+- Sets **nonce-based CSP** with `'strict-dynamic'` — no `unsafe-inline` for scripts. Nonce is generated per-request via `crypto.randomUUID()`, base64-encoded, forwarded to Next.js via `x-nonce` request header.
+- `src/app/layout.tsx` calls `headers()` to force dynamic rendering on all routes — required so Next.js applies the nonce to its own inline scripts. Without this, prerendered pages would have no nonce and scripts would be blocked.
 - Redirects unauthenticated users to `/login`
 - Enforces superadmin-only routes by querying the `admins` table in DB:
   ```
@@ -132,6 +133,21 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 All tables have RLS enabled. Two DB roles:
 - `is_admin()` — checks `admins` table for current `auth.uid()`
 - `operator_city_id()` — returns `city_id` from `operators` table for current `auth.uid()`
+
+All write operations on key tables are logged via `audit_trigger_fn()` (SECURITY DEFINER) into `audit_log`. Covered tables: `orders`, `menu_items`, `categories`, `city_menu_items`, `carousel_cards`, `promocodes`, `cities`, `operators`, `admins`, `restaurants`.
+
+`service_role` PostgreSQL role must have GRANT on all tables it touches (including `carousel_cards` and `audit_log`). If you add a new table accessed by server-side code using the service key, run: `GRANT ALL ON TABLE <table> TO service_role;`
+
+### GoTrue Rate Limiting
+Configured in `VPS_DEPLOY_PATH/supabase/docker/docker-compose.yml` under the `auth` service:
+- `GOTRUE_RATE_LIMIT_EMAIL_SENT: "10"` — max 10 emails/hour
+- `GOTRUE_RATE_LIMIT_TOKEN_REFRESH: "150"` — max 150 token refreshes/hour
+- `GOTRUE_RATE_LIMIT_VERIFY: "30"` — max 30 verify attempts/hour
+
+To apply changes: `cd VPS_DEPLOY_PATH/supabase/docker && docker compose restart auth`
+
+### Images
+All menu item and carousel images are stored in self-hosted Supabase Storage at `https://supabase.shilmeyster.ru`. Do not reference external image domains — CSP `img-src` only allows `self`, `data:`, `blob:`, and `https://supabase.shilmeyster.ru`.
 
 ### Deployment
 - App runs in a **Docker container** (`admin-panel`) managed by Docker Compose at `VPS_DEPLOY_PATH/docker-compose.yml`

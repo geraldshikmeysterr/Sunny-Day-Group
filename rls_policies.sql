@@ -346,7 +346,7 @@ DO $$
 DECLARE
   t text;
 BEGIN
-  FOREACH t IN ARRAY ARRAY['orders','menu_items','categories','carousel_cards','promocodes','cities','operators','admins','restaurants'] LOOP
+  FOREACH t IN ARRAY ARRAY['orders','menu_items','categories','city_menu_items','carousel_cards','promocodes','cities','operators','admins','restaurants'] LOOP
     EXECUTE format('
       DROP TRIGGER IF EXISTS audit_%I ON %I;
       CREATE TRIGGER audit_%I

@@ -22,7 +22,7 @@ export default function GuestsPage() {
       .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
     if (search.trim()) {
       // Escape PostgREST/SQL wildcard characters to prevent pattern injection
-      const safe = search.replaceAll(/[\\%_*]/g, String.raw`\$&`).replaceAll(/[(),. ]/g, "");
+      const safe = search.replaceAll(/[\\%_*]/g, String.raw`\$&`).replaceAll(/[(),.]/g, "");
       q = q.or(`phone.ilike.%${safe}%,first_name.ilike.%${safe}%,last_name.ilike.%${safe}%`);
     }
     const { data, count } = await q;
