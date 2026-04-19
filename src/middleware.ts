@@ -27,7 +27,7 @@ function buildCsp(nonce: string): string {
 
 function applySecurityHeaders(res: NextResponse, csp: string): void {
   res.headers.set("Content-Security-Policy", csp);
-  res.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  res.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
   res.headers.set("X-Frame-Options", "DENY");
   res.headers.set("X-Content-Type-Options", "nosniff");
   res.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");

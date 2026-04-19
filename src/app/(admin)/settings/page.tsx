@@ -86,9 +86,13 @@ export default function SettingsPage() {
     const { data: session } = await supabase.auth.getSession();
     const token = session?.session?.access_token;
     if (!token) { toast.error("Сессия истекла, войдите заново"); return; }
-    const { data, error } = await supabase.auth.mfa.challenge({ factorId: id });
-    if (error || !data) { toast.error("Ошибка: " + error?.message); return; }
-    setUnenrollConfirm({ factorId: id, challengeId: data.id, token });
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/factors/${id}/challenge`,
+      { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY! }, body: "{}" }
+    );
+    if (!res.ok) { toast.error("Ошибка создания challenge"); return; }
+    const { id: challengeId } = await res.json();
+    setUnenrollConfirm({ factorId: id, challengeId, token });
     setUnenrollCode("");
   }
 

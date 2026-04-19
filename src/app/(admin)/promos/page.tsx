@@ -51,9 +51,14 @@ export default function PromosPage() {
   }
 
   async function save() {
-    if (!form.code) return;
+    const code = form.code.toUpperCase().trim();
+    if (!code) return;
+    if (!/^[A-Z0-9_-]{1,50}$/.test(code)) { toast.error("Код: только буквы, цифры, _ и -, максимум 50 символов"); return; }
+    const discountValue = parseFloat(form.discount_value);
+    if (isNaN(discountValue) || discountValue <= 0) { toast.error("Укажите размер скидки больше 0"); return; }
+    if (form.promo_type === "percent" && discountValue > 100) { toast.error("Скидка в % не может превышать 100"); return; }
     setSaving(true);
-    const payload = {code:form.code.toUpperCase().trim(),description:form.description||null,promo_type:form.promo_type,discount_value:parseFloat(form.discount_value)||0,promo_scope:form.promo_scope,min_order_amount:form.min_order_amount?parseFloat(form.min_order_amount):null,max_uses:form.max_uses?parseInt(form.max_uses):null,valid_from:form.valid_from||null,valid_until:form.valid_until||null,city_id:form.city_id||null,is_active:form.is_active};
+    const payload = {code,description:form.description||null,promo_type:form.promo_type,discount_value:discountValue,promo_scope:form.promo_scope,min_order_amount:form.min_order_amount?parseFloat(form.min_order_amount):null,max_uses:form.max_uses?parseInt(form.max_uses):null,valid_from:form.valid_from||null,valid_until:form.valid_until||null,city_id:form.city_id||null,is_active:form.is_active};
     if (editing) await supabase.from("promocodes").update(payload).eq("id",editing.id);
     else await supabase.from("promocodes").insert(payload);
     toast.success(editing?"Промокод обновлён":"Промокод создан");
@@ -112,7 +117,7 @@ export default function PromosPage() {
             </div>
             <div className="overflow-y-auto flex-1 p-6 space-y-4">
               <div className="grid grid-cols-2 gap-3">
-                <div><label className="label">Код *</label><input value={form.code} onChange={e=>setForm((p:any)=>({...p,code:e.target.value.toUpperCase()}))} className="input font-mono" placeholder="SUNNY20" autoComplete="off"/></div>
+                <div><label className="label">Код *</label><input value={form.code} onChange={e=>setForm((p:any)=>({...p,code:e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g,"")}))} className="input font-mono" placeholder="SUNNY20" maxLength={50} autoComplete="off"/></div>
                 <div><label className="label">Город</label><CustomSelect value={form.city_id} onChange={v=>setForm((p:any)=>({...p,city_id:v}))} options={cityOptions}/></div>
               </div>
               <div><label className="label">Описание</label><textarea value={form.description} onChange={e=>setForm((p:any)=>({...p,description:e.target.value}))} rows={3} className="textarea w-full" placeholder="Описание промокода"/></div>
