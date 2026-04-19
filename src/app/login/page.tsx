@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Loader2 } from "lucide-react";
@@ -16,6 +16,26 @@ export default function LoginPage() {
   const [mfaCode, setMfaCode] = useState("");
   const [mfaStep, setMfaStep] = useState(false);
   const [mfaLoading, setMfaLoading] = useState(false);
+
+  // Restore MFA step if page is refreshed during MFA flow
+  useEffect(() => {
+    async function checkPendingMfa() {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      if (aal?.currentLevel !== "aal1" || aal?.nextLevel !== "aal2") return;
+      const { data: factors } = await supabase.auth.mfa.listFactors();
+      const totp = factors?.totp?.[0];
+      if (!totp) return;
+      const { data: challenge } = await supabase.auth.mfa.challenge({ factorId: totp.id });
+      if (!challenge) return;
+      setMfaFactorId(totp.id);
+      setMfaChallengeId(challenge.id);
+      setMfaStep(true);
+    }
+    checkPendingMfa();
+  }, []);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -99,7 +119,8 @@ export default function LoginPage() {
             <input
               value={mfaCode}
               onChange={e => setMfaCode(e.target.value.replaceAll(/\D/g, "").slice(0, 6))}
-              className="w-full py-2.5 pl-[0.5em] rounded-xl text-center text-2xl font-mono tracking-[0.5em] bg-white/15 text-white placeholder-white/40 border border-white/25 outline-none focus:bg-white/25 focus:border-white/50 transition"
+              className="w-full py-2.5 rounded-xl text-center text-2xl font-mono bg-white/15 text-white placeholder-white/40 border border-white/25 outline-none focus:bg-white/25 focus:border-white/50 transition"
+              style={{ letterSpacing: "0.5em", paddingLeft: "0.5em" }}
               placeholder="000000"
               maxLength={6}
               autoComplete="one-time-code"

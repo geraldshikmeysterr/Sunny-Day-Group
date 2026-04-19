@@ -66,13 +66,34 @@ export async function middleware(request: NextRequest) {
   const isLogin = path.startsWith("/login");
 
   if (!user && !isLogin) return NextResponse.redirect(new URL("/login", request.url));
-  if (user && isLogin) {
-    // Only redirect if MFA is not pending (AAL1 == AAL2 means no MFA required or already completed)
-    const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-    if (!aal || aal.currentLevel === aal.nextLevel) {
+
+  if (user) {
+    // Determine if user has enrolled TOTP and whether current session satisfies it.
+    // user.factors comes from getUser() — reliable server-side data.
+    const hasVerifiedTotp = (user.factors ?? []).some(
+      (f: any) => f.factor_type === "totp" && f.status === "verified"
+    );
+
+    let mfaComplete = true; // assume complete if no TOTP enrolled
+    if (hasVerifiedTotp) {
+      // Decode JWT AMR claim — no extra network call; JWT is signed by GoTrue.
+      const { data: { session } } = await supabase.auth.getSession();
+      try {
+        const payload = JSON.parse(
+          Buffer.from(session!.access_token.split(".")[1], "base64").toString()
+        );
+        mfaComplete = (payload.amr ?? []).some((m: any) => m.method === "totp");
+      } catch { mfaComplete = false; }
+    }
+
+    if (!mfaComplete && !isLogin) {
+      // Prevent AAL1 users with enrolled TOTP from accessing any admin route
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
+    if (mfaComplete && isLogin) {
       return NextResponse.redirect(new URL("/active-orders", request.url));
     }
-    // MFA required but not yet completed — stay on login page
+    // !mfaComplete && isLogin → stay on /login so client shows MFA form
   }
 
   // Enforce superadmin-only route access at the server level
