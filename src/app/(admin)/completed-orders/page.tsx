@@ -73,7 +73,7 @@ export default function CompletedOrdersPage() {
                   <td className="font-mono text-xs font-bold">#{order.id.slice(0,8).toUpperCase()}</td>
                   <td><p className="font-medium text-sm">{order.profiles?.phone??"—"}</p>{order.profiles?.first_name&&<p className="text-xs text-neutral-400">{order.profiles.first_name}</p>}</td>
                   {isAdmin&&<td className="text-sm text-neutral-500">{order.cities?.name??"—"}</td>}
-                  <td className="text-xs text-neutral-600 min-w-[160px] max-w-[220px] whitespace-normal">{order.addresses?.full_address ?? `${order.addresses?.street??""} ${order.addresses?.house??""}`.trim() || "—"}</td>
+                  <td className="text-xs text-neutral-600 min-w-[160px] max-w-[220px] whitespace-normal">{(order.addresses?.full_address ?? `${order.addresses?.street??""} ${order.addresses?.house??""}`.trim()) || "—"}</td>
                   <td className="text-xs text-neutral-500 min-w-[180px] max-w-[280px] whitespace-normal">{order.order_items?.map((i:any)=>`${i.item_name} ×${i.quantity}`).join(", ")||"—"}</td>
                   <td className="text-xs text-brand-500 italic min-w-[120px] max-w-[200px] whitespace-normal">{order.comment||"—"}</td>
                   <td className="num font-semibold whitespace-nowrap">{((order.total_amount??0)/100).toLocaleString("ru-RU")} ₽</td>
