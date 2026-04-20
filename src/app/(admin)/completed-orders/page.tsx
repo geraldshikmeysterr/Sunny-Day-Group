@@ -30,7 +30,7 @@ export default function CompletedOrdersPage() {
     setLoading(true);
     try {
       let q = supabase.from("orders")
-        .select("id,status,total_amount,delivery_fee,created_at,payment_status,profiles(phone,first_name),order_items(item_name,quantity),cities(name)", { count: "exact" })
+        .select("id,status,total_amount,delivery_fee,created_at,payment_status,comment,profiles(phone,first_name),addresses(full_address,street,house),order_items(item_name,quantity),cities(name)", { count: "exact" })
         .in("status", ["delivered","cancelled"])
         .range(page*PAGE_SIZE,(page+1)*PAGE_SIZE-1)
         .order("created_at",{ascending:false});
@@ -51,7 +51,7 @@ export default function CompletedOrdersPage() {
   const statusOptions = [{ value:"all", label:"Все статусы" }, {value:"delivered",label:"Доставлен"}, {value:"cancelled",label:"Отменён"}];
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-5">
+    <div className="p-6 max-w-full mx-auto space-y-5">
       <div className="flex items-center justify-between">
         <div><h1 className="text-3xl font-bold text-neutral-900">Выполненные заказы</h1><p className="text-sm text-neutral-500 mt-0.5">{total} заказов завершено</p></div>
         <button onClick={fetchOrders} disabled={loading} className="btn-secondary btn-sm"><RefreshCw size={14} className={loading?"animate-spin":""}/> Обновить</button>
@@ -64,23 +64,25 @@ export default function CompletedOrdersPage() {
       <div className="card overflow-hidden">
         <div className="table-wrapper rounded-none border-0">
           <table className="table">
-            <thead><tr><th>Заказ</th><th>Клиент</th>{isAdmin&&<th>Город</th>}<th>Состав</th><th>Сумма</th><th>Статус</th><th>Оплата</th><th>Дата</th></tr></thead>
+            <thead><tr><th>Заказ</th><th>Клиент</th>{isAdmin&&<th>Город</th>}<th>Адрес</th><th>Состав</th><th>Комментарий</th><th>Сумма</th><th>Статус</th><th>Оплата</th><th>Дата</th></tr></thead>
             <tbody>
-              {loading&&Array.from({length:6}).map((_,i)=><tr key={i}>{Array.from({length:isAdmin?8:7}).map((_,j)=><td key={j}><div className="skeleton h-4"/></td>)}</tr>)}
+              {loading&&Array.from({length:6}).map((_,i)=><tr key={i}>{Array.from({length:isAdmin?10:9}).map((_,j)=><td key={j}><div className="skeleton h-4"/></td>)}</tr>)}
               {!loading&&filtered.map(order=>{
                 const c=ORDER_STATUS_COLORS[order.status as OrderStatus];
                 return(<tr key={order.id}>
                   <td className="font-mono text-xs font-bold">#{order.id.slice(0,8).toUpperCase()}</td>
                   <td><p className="font-medium text-sm">{order.profiles?.phone??"—"}</p>{order.profiles?.first_name&&<p className="text-xs text-neutral-400">{order.profiles.first_name}</p>}</td>
                   {isAdmin&&<td className="text-sm text-neutral-500">{order.cities?.name??"—"}</td>}
-                  <td className="max-w-xs"><span className="text-xs text-neutral-500 line-clamp-2">{order.order_items?.map((i:any)=>`${i.item_name} ×${i.quantity}`).join(", ")}</span></td>
+                  <td className="text-xs text-neutral-600 min-w-[160px] max-w-[220px] whitespace-normal">{order.addresses?.full_address ?? `${order.addresses?.street??""} ${order.addresses?.house??""}`.trim() || "—"}</td>
+                  <td className="text-xs text-neutral-500 min-w-[180px] max-w-[280px] whitespace-normal">{order.order_items?.map((i:any)=>`${i.item_name} ×${i.quantity}`).join(", ")||"—"}</td>
+                  <td className="text-xs text-brand-500 italic min-w-[120px] max-w-[200px] whitespace-normal">{order.comment||"—"}</td>
                   <td className="num font-semibold whitespace-nowrap">{((order.total_amount??0)/100).toLocaleString("ru-RU")} ₽</td>
                   <td><span className={`badge ${c.bg} ${c.text}`}><span className={`w-1.5 h-1.5 rounded-full ${c.dot}`}/>{ORDER_STATUS_LABELS[order.status as OrderStatus]}</span></td>
                   <td><span className={`badge text-xs ${order.payment_status==="paid"?"bg-success-50 text-success-700":"bg-neutral-100 text-neutral-500"}`}>{order.payment_status==="paid"?"Оплачен":order.payment_status==="refunded"?"Возврат":"—"}</span></td>
                   <td className="text-xs text-neutral-400 num whitespace-nowrap">{formatDateTime(order.created_at)}</td>
                 </tr>);
               })}
-              {!loading&&!filtered.length&&<tr><td colSpan={isAdmin?8:7} className="py-16 text-center text-neutral-400">Нет завершённых заказов</td></tr>}
+              {!loading&&!filtered.length&&<tr><td colSpan={isAdmin?10:9} className="py-16 text-center text-neutral-400">Нет завершённых заказов</td></tr>}
             </tbody>
           </table>
         </div>
