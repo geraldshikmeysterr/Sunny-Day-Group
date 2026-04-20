@@ -100,16 +100,16 @@ export default function ActiveOrdersPage() {
                 const items = order.order_items?.map((i:any)=>`${i.item_name} ×${i.quantity}`).join(", ");
                 return (
                   <tr key={order.id}>
-                    <td className="font-mono text-xs font-bold text-neutral-900">#{order.id.slice(0,8).toUpperCase()}</td>
-                    <td><p className="font-medium text-sm">{order.profiles?.phone??"—"}</p>{order.profiles?.first_name&&<p className="text-xs text-neutral-400">{order.profiles.first_name}</p>}</td>
-                    {isAdmin && <td className="text-sm text-neutral-500">{order.cities?.name??"—"}</td>}
-                    <td className="text-xs text-neutral-600 min-w-[160px] max-w-[220px] whitespace-normal">{addr||"—"}</td>
-                    <td className="text-xs text-neutral-500 min-w-[180px] max-w-[280px] whitespace-normal">{items||"—"}</td>
-                    <td className="text-xs text-brand-500 italic min-w-[120px] max-w-[200px] whitespace-normal">{order.comment||"—"}</td>
-                    <td className="num whitespace-nowrap"><p className="font-semibold">{((order.total_amount??0)/100).toLocaleString("ru-RU")} ₽</p>{order.delivery_fee>0&&<p className="text-xs text-neutral-400">+{(order.delivery_fee/100).toLocaleString("ru-RU")} ₽</p>}</td>
-                    <td><span className={`badge ${c.bg} ${c.text}`}><span className={`w-1.5 h-1.5 rounded-full ${c.dot}`}/>{ORDER_STATUS_LABELS[order.status as OrderStatus]}</span></td>
-                    <td className="text-xs text-neutral-400 num whitespace-nowrap">{formatDateTime(order.created_at)}</td>
-                    <td>{nextStatus&&<button onClick={()=>advance(order.id,nextStatus)} disabled={updating===order.id} className="btn-ghost btn-sm text-brand-500 border border-brand-200 hover:bg-brand-50 whitespace-nowrap">{updating===order.id?<Loader2 size={12} className="animate-spin"/>:<ArrowRight size={12}/>}{ORDER_STATUS_LABELS[nextStatus]}</button>}</td>
+                    <td className="w-px whitespace-nowrap font-mono text-xs font-bold text-neutral-900">#{order.id.slice(0,8).toUpperCase()}</td>
+                    <td className="w-px whitespace-nowrap"><p className="font-medium text-sm">{order.profiles?.phone??"—"}</p>{order.profiles?.first_name&&<p className="text-xs text-neutral-400">{order.profiles.first_name}</p>}</td>
+                    {isAdmin && <td className="w-px whitespace-nowrap text-sm text-neutral-500">{order.cities?.name??"—"}</td>}
+                    <td className="text-xs text-neutral-600 whitespace-normal min-w-[180px]">{addr||"—"}</td>
+                    <td className="text-xs text-neutral-500 whitespace-normal min-w-[200px]">{items||"—"}</td>
+                    <td className="text-xs text-brand-500 italic whitespace-normal min-w-[140px]">{order.comment||"—"}</td>
+                    <td className="w-px whitespace-nowrap num"><p className="font-semibold">{((order.total_amount??0)/100).toLocaleString("ru-RU")} ₽</p>{order.delivery_fee>0&&<p className="text-xs text-neutral-400">+{(order.delivery_fee/100).toLocaleString("ru-RU")} ₽</p>}</td>
+                    <td className="w-px whitespace-nowrap"><span className={`badge ${c.bg} ${c.text}`}><span className={`w-1.5 h-1.5 rounded-full ${c.dot}`}/>{ORDER_STATUS_LABELS[order.status as OrderStatus]}</span></td>
+                    <td className="w-px whitespace-nowrap text-xs text-neutral-400 num">{formatDateTime(order.created_at)}</td>
+                    <td className="w-px whitespace-nowrap">{nextStatus&&<button onClick={()=>advance(order.id,nextStatus)} disabled={updating===order.id} className="btn-ghost btn-sm text-brand-500 border border-brand-200 hover:bg-brand-50 whitespace-nowrap">{updating===order.id?<Loader2 size={12} className="animate-spin"/>:<ArrowRight size={12}/>}{ORDER_STATUS_LABELS[nextStatus]}</button>}</td>
                   </tr>
                 );
               })}

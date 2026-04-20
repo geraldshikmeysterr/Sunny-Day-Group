@@ -70,16 +70,16 @@ export default function CompletedOrdersPage() {
               {!loading&&filtered.map(order=>{
                 const c=ORDER_STATUS_COLORS[order.status as OrderStatus];
                 return(<tr key={order.id}>
-                  <td className="font-mono text-xs font-bold">#{order.id.slice(0,8).toUpperCase()}</td>
-                  <td><p className="font-medium text-sm">{order.profiles?.phone??"—"}</p>{order.profiles?.first_name&&<p className="text-xs text-neutral-400">{order.profiles.first_name}</p>}</td>
-                  {isAdmin&&<td className="text-sm text-neutral-500">{order.cities?.name??"—"}</td>}
-                  <td className="text-xs text-neutral-600 min-w-[160px] max-w-[220px] whitespace-normal">{(order.addresses?.full_address ?? `${order.addresses?.street??""} ${order.addresses?.house??""}`.trim()) || "—"}</td>
-                  <td className="text-xs text-neutral-500 min-w-[180px] max-w-[280px] whitespace-normal">{order.order_items?.map((i:any)=>`${i.item_name} ×${i.quantity}`).join(", ")||"—"}</td>
-                  <td className="text-xs text-brand-500 italic min-w-[120px] max-w-[200px] whitespace-normal">{order.comment||"—"}</td>
-                  <td className="num font-semibold whitespace-nowrap">{((order.total_amount??0)/100).toLocaleString("ru-RU")} ₽</td>
-                  <td><span className={`badge ${c.bg} ${c.text}`}><span className={`w-1.5 h-1.5 rounded-full ${c.dot}`}/>{ORDER_STATUS_LABELS[order.status as OrderStatus]}</span></td>
-                  <td><span className={`badge text-xs ${order.payment_status==="paid"?"bg-success-50 text-success-700":"bg-neutral-100 text-neutral-500"}`}>{order.payment_status==="paid"?"Оплачен":order.payment_status==="refunded"?"Возврат":"—"}</span></td>
-                  <td className="text-xs text-neutral-400 num whitespace-nowrap">{formatDateTime(order.created_at)}</td>
+                  <td className="w-px whitespace-nowrap font-mono text-xs font-bold">#{order.id.slice(0,8).toUpperCase()}</td>
+                  <td className="w-px whitespace-nowrap"><p className="font-medium text-sm">{order.profiles?.phone??"—"}</p>{order.profiles?.first_name&&<p className="text-xs text-neutral-400">{order.profiles.first_name}</p>}</td>
+                  {isAdmin&&<td className="w-px whitespace-nowrap text-sm text-neutral-500">{order.cities?.name??"—"}</td>}
+                  <td className="text-xs text-neutral-600 whitespace-normal min-w-[180px]">{(order.addresses?.full_address ?? `${order.addresses?.street??""} ${order.addresses?.house??""}`.trim()) || "—"}</td>
+                  <td className="text-xs text-neutral-500 whitespace-normal min-w-[200px]">{order.order_items?.map((i:any)=>`${i.item_name} ×${i.quantity}`).join(", ")||"—"}</td>
+                  <td className="text-xs text-brand-500 italic whitespace-normal min-w-[140px]">{order.comment||"—"}</td>
+                  <td className="w-px whitespace-nowrap num font-semibold">{((order.total_amount??0)/100).toLocaleString("ru-RU")} ₽</td>
+                  <td className="w-px whitespace-nowrap"><span className={`badge ${c.bg} ${c.text}`}><span className={`w-1.5 h-1.5 rounded-full ${c.dot}`}/>{ORDER_STATUS_LABELS[order.status as OrderStatus]}</span></td>
+                  <td className="w-px whitespace-nowrap"><span className={`badge text-xs ${order.payment_status==="paid"?"bg-success-50 text-success-700":"bg-neutral-100 text-neutral-500"}`}>{order.payment_status==="paid"?"Оплачен":order.payment_status==="refunded"?"Возврат":"—"}</span></td>
+                  <td className="w-px whitespace-nowrap text-xs text-neutral-400 num">{formatDateTime(order.created_at)}</td>
                 </tr>);
               })}
               {!loading&&!filtered.length&&<tr><td colSpan={isAdmin?10:9} className="py-16 text-center text-neutral-400">Нет завершённых заказов</td></tr>}
