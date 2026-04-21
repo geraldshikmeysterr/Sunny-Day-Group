@@ -182,3 +182,11 @@ All menu item and carousel images are stored in self-hosted Supabase Storage at 
   docker compose up -d admin-panel
   ```
 - Admin panel URL: `https://admin.shilmeyster.ru`
+
+### Disk Maintenance
+
+Docker build cache accumulates over time. Check usage with `docker system df`. Clean with:
+```bash
+docker builder prune -f
+```
+This removes only build cache — running containers and images are not affected. VPS disk: 80 GB total; ~19 GB used after cleanup (April 2026).
