@@ -67,7 +67,6 @@ export default function CitiesPage() {
     return session.access_token;
   }
 
-  // ── Создать город ─────────────────────────────────────────────────────────
   async function createCity() {
     if (!addForm.city_name || !addForm.operator_email || !addForm.operator_password) {
       setError("Заполните обязательные поля"); return;
@@ -91,7 +90,6 @@ export default function CitiesPage() {
         operator_password: addForm.operator_password,
       }, token);
 
-      // Сохраняем контакты если заполнены
       if (result.city?.id) {
         const socials: any = {};
         if (addForm.city_phone)    socials.phone         = addForm.city_phone;
@@ -103,7 +101,6 @@ export default function CitiesPage() {
         if (Object.keys(socials).length > 0) {
           await supabase.from("cities").update(socials).eq("id", result.city.id);
         }
-        // Инициализируем city_menu_items для нового города
         try {
           const { data: menuItems } = await supabase
             .from("menu_items").select("id").eq("is_global_active", true);
@@ -113,7 +110,7 @@ export default function CitiesPage() {
               { onConflict: "city_id,menu_item_id" }
             );
           }
-        } catch { /* city_menu_items заполнятся позже */ }
+        } catch {}
       }
 
       toast.success(`Город «${result.city?.name ?? addForm.city_name}» создан`);
@@ -122,7 +119,6 @@ export default function CitiesPage() {
     setSaving(false);
   }
 
-  // ── Редактировать город ───────────────────────────────────────────────────
   async function saveCity() {
     if (!editModal) return;
     setSaving(true);
@@ -134,7 +130,6 @@ export default function CitiesPage() {
         vk: editForm.vk || null, max_messenger: editForm.max || null,
       }).eq("id", editModal.id);
 
-      // Смена оператора только если заполнены оба поля
       if (editForm.op_email && editForm.op_password) {
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editForm.op_email)) {
           setError("Некорректный формат email оператора"); setSaving(false); return;
@@ -144,12 +139,10 @@ export default function CitiesPage() {
         }
         const oldOp = operators[editModal.id];
         const token = await getToken();
-        // Удаляем из Auth сначала — если упадёт, DB-запись останется целой
         if (oldOp) {
           await callEdgeFunction("delete-operator", { user_id: oldOp.id }, token).catch(() => {});
           await supabase.from("operators").delete().eq("id", oldOp.id);
         }
-        // Создаём нового оператора через Edge Function (имеет service role)
         try {
           await callEdgeFunction("create-operator", {
             city_name: editModal.name,
@@ -170,7 +163,6 @@ export default function CitiesPage() {
     setSaving(false);
   }
 
-  // ── Удалить город + оператора из Auth ─────────────────────────────────────
   async function deleteCity(city: City) {
     const op = operators[city.id];
     if (!confirm(op ? `Удалить город «${city.name}» и оператора «${op.email}»?` : `Удалить город «${city.name}»?`)) return;
@@ -178,7 +170,6 @@ export default function CitiesPage() {
     try {
       const token = await getToken();
       if (op) {
-        // Удаляем из Auth сначала — если упадёт, DB-запись останется целой
         await callEdgeFunction("delete-operator", { user_id: op.id }, token);
         await supabase.from("operators").delete().eq("id", op.id);
       }
@@ -275,7 +266,6 @@ export default function CitiesPage() {
         </div>
       )}
 
-      {/* Модалка добавления */}
       {addModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
           <div className="bg-white rounded-2xl shadow-card-lg w-full max-w-lg max-h-[90vh] flex flex-col animate-scale-in">
@@ -357,7 +347,6 @@ export default function CitiesPage() {
         </div>
       )}
 
-      {/* Модалка редактирования */}
       {editModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
           <div className="bg-white rounded-2xl shadow-card-lg w-full max-w-lg max-h-[90vh] flex flex-col animate-scale-in">

@@ -69,7 +69,6 @@ export function Sidebar() {
     <aside className="fixed left-0 top-0 h-screen flex flex-col z-30"
       style={{ width: "var(--sidebar-width)", background: "linear-gradient(180deg, #F57300 0%, #E06500 100%)" }}>
 
-            {/* Логотип */}
       <div className="shrink-0" style={{ borderBottom: "1px solid rgba(255,255,255,0.15)", padding: "12px 12px" }}>
         <img
           src="/logo.png"
@@ -78,7 +77,6 @@ export function Sidebar() {
         />
       </div>
 
-      {/* Навигация */}
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-5">
         {visibleNav.map(section => (
           <div key={section.title}>
@@ -106,7 +104,6 @@ export function Sidebar() {
         ))}
       </nav>
 
-      {/* Выход */}
       <div className="px-3 py-4 shrink-0" style={{ borderTop: "1px solid rgba(255,255,255,0.15)" }}>
         <button onClick={logout}
           className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm font-medium text-white/70 hover:text-white hover:bg-white/10 transition-all">

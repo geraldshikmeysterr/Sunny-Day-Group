@@ -1,7 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-// Routes accessible only to admins (superadmin role)
 const ADMIN_ONLY_ROUTES = [
   "/menu-editor",
   "/menu/schedule",
@@ -38,7 +37,6 @@ export async function middleware(request: NextRequest) {
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
   const csp = buildCsp(nonce);
 
-  // Forward nonce to Next.js so it applies it to its own inline scripts
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-nonce", nonce);
 
@@ -68,15 +66,12 @@ export async function middleware(request: NextRequest) {
   if (!user && !isLogin) return NextResponse.redirect(new URL("/login", request.url));
 
   if (user) {
-    // Determine if user has enrolled TOTP and whether current session satisfies it.
-    // user.factors comes from getUser() — reliable server-side data.
     const hasVerifiedTotp = (user.factors ?? []).some(
       (f: any) => f.factor_type === "totp" && f.status === "verified"
     );
 
-    let mfaComplete = true; // assume complete if no TOTP enrolled
+    let mfaComplete = true;
     if (hasVerifiedTotp) {
-      // Decode JWT AMR claim — no extra network call; JWT is signed by GoTrue.
       const { data: { session } } = await supabase.auth.getSession();
       try {
         const payload = JSON.parse(
@@ -87,16 +82,13 @@ export async function middleware(request: NextRequest) {
     }
 
     if (!mfaComplete && !isLogin) {
-      // Prevent AAL1 users with enrolled TOTP from accessing any admin route
       return NextResponse.redirect(new URL("/login", request.url));
     }
     if (mfaComplete && isLogin) {
       return NextResponse.redirect(new URL("/active-orders", request.url));
     }
-    // !mfaComplete && isLogin → stay on /login so client shows MFA form
   }
 
-  // Enforce superadmin-only route access at the server level
   if (user && ADMIN_ONLY_ROUTES.some(r => path === r || path.startsWith(r + "/"))) {
     const { data: admin } = await supabase
       .from("admins").select("id").eq("id", user.id).maybeSingle();

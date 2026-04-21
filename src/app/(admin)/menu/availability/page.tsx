@@ -73,7 +73,6 @@ export default function AvailabilityPage() {
   const [editing, setEditing] = useState<{ itemId: string; cityId: string } | null>(null);
   const [priceInput, setPriceInput] = useState("");
 
-  // Загрузка данных
   const load = useCallback(async () => {
     if (!loaded) return;
     setLoading(true);
@@ -104,7 +103,6 @@ export default function AvailabilityPage() {
 
     if (types.length) setActiveType(types[0].id);
 
-    // Строим матрицу
     const m: Matrix = {};
     for (const row of cmiRes.data ?? []) {
       if (!m[row.menu_item_id]) m[row.menu_item_id] = {};
@@ -112,7 +110,6 @@ export default function AvailabilityPage() {
     }
     setMatrix(m);
 
-    // Оператор — только его город; Админ — пустой выбор (сам выбирает)
     if (!isAdmin && opCityId) {
       setSelectedCities(new Set([opCityId]));
     } else {
@@ -132,11 +129,8 @@ export default function AvailabilityPage() {
     });
   }
 
-  // Переключить блюдо для города
   async function toggleItem(itemId: string, cityId: string) {
     const cur    = matrix[itemId]?.[cityId];
-    // Если записи нет — создаём с is_available=true (включено)
-    // Если запись есть — переключаем
     const newVal = cur ? !cur.is_available : true;
     const k      = `${itemId}_${cityId}`;
     setMatrix(p => ({ ...p, [itemId]: { ...p[itemId], [cityId]: { is_available: newVal, price: cur?.price ?? 0 } } }));
@@ -152,7 +146,6 @@ export default function AvailabilityPage() {
     } finally { setSaving(null); }
   }
 
-  // Сохранить цену
   async function savePrice(itemId: string, cityId: string) {
     const rubles = parseFloat(priceInput.replace(",", "."));
     const price  = !priceInput.trim() || isNaN(rubles) || rubles < 0 ? 0 : rubles;
@@ -194,7 +187,6 @@ export default function AvailabilityPage() {
         <p className="text-sm text-neutral-500 mt-1">Управляйте доступностью и ценами для каждого города.</p>
       </div>
 
-      {/* Легенда */}
       <div className="card p-4 flex flex-wrap gap-4 text-sm">
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 rounded bg-success-50 border border-success-200 flex items-center justify-center"><Check size={12} className="text-success-600" /></div>
@@ -210,9 +202,7 @@ export default function AvailabilityPage() {
         </div>
       </div>
 
-      {/* Фильтры */}
       <div className="card p-4 flex flex-wrap gap-3 items-center sticky top-4 z-20 bg-white shadow-card">
-        {/* Тип меню */}
         <div className="flex gap-2">
           {menuTypes.map(t => (
             <button key={t.id} onClick={() => setActiveType(t.id)}
@@ -265,7 +255,6 @@ export default function AvailabilityPage() {
               <tbody>
                 {grouped.map(({ cat, items: catItems }) => (
                   <React.Fragment key={cat.id}>
-                    {/* Строка категории */}
                     <tr className="bg-neutral-50/80 border-b border-neutral-200">
                       <td className="px-4 py-2 sticky left-0 bg-neutral-50/80 border-r border-neutral-200 z-10">
                         <span className="text-xs font-bold uppercase tracking-wider text-neutral-500">{cat.name}</span>
@@ -276,7 +265,6 @@ export default function AvailabilityPage() {
                         </td>
                       ))}
                     </tr>
-                    {/* Блюда */}
                     {catItems.map(item => (
                       <tr key={item.id} className="border-b border-neutral-100 hover:bg-neutral-50/40 group">
                         <td className="px-4 py-3 sticky left-0 bg-white group-hover:bg-neutral-50/60 border-r border-neutral-200 z-10 pl-8">
@@ -294,7 +282,6 @@ export default function AvailabilityPage() {
                           return (
                             <td key={city.id} className="px-3 py-2 text-center">
                               <div className="flex flex-col items-center gap-1">
-                                {/* Кнопка доступности — если нет записи, создаём upsert */}
                                 <button
                                   onClick={() => toggleItem(item.id, city.id)}
                                   disabled={!!saving}
@@ -312,7 +299,6 @@ export default function AvailabilityPage() {
                                     ? <Check size={12} className={hasPrice ? "text-success-500" : "text-brand-500"} />
                                     : <X size={12} className="text-neutral-400" />}
                                 </button>
-                                {/* Цена */}
                                 {cell && isAvail && (
                                   isEditing ? (
                                     <div className="flex gap-1 items-center">
@@ -323,7 +309,6 @@ export default function AvailabilityPage() {
                                           if (e.key === "Escape") setEditing(null);
                                         }}
                                         onBlur={e => {
-                                          // Не закрываем если кликнули по кнопке сохранения
                                           if (!e.relatedTarget) setTimeout(() => setEditing(null), 150);
                                         }}
                                         placeholder="0"

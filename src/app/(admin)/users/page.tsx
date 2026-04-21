@@ -34,7 +34,6 @@ export default function UsersPage() {
         id: a.id, full_name: a.full_name, email: a.email, created_at: a.created_at,
         role: "admin", city: null, is_active: true,
       }));
-      // Объединяем: сначала администраторы, потом операторы
       setUsers([...adminRows, ...operatorRows]);
       setLoading(false);
     });
@@ -53,7 +52,6 @@ export default function UsersPage() {
         <p className="text-sm text-neutral-500 mt-0.5">Администраторы и операторы системы</p>
       </div>
 
-      {/* Пункт 5: поиск на всю карточку */}
       <div className="card p-4">
         <div className="relative w-full">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />

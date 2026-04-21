@@ -21,7 +21,6 @@ export default function GuestsPage() {
       .order("created_at", { ascending: false })
       .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
     if (search.trim()) {
-      // Escape PostgREST/SQL wildcard characters to prevent pattern injection
       const safe = search.replaceAll(/[\\%_*]/g, String.raw`\$&`).replaceAll(/[(),.]/g, "");
       q = q.or(`phone.ilike.%${safe}%,first_name.ilike.%${safe}%,last_name.ilike.%${safe}%`);
     }
@@ -41,7 +40,6 @@ export default function GuestsPage() {
         <p className="text-sm text-neutral-500 mt-0.5">{total} зарегистрированных</p>
       </div>
 
-      {/* Поиск на полную ширину как в Пользователи */}
       <div className="card p-4">
         <div className="relative w-full">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />

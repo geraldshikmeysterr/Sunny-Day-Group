@@ -38,7 +38,6 @@ const EMPTY_FORM = {
 const getTypeName = (name: string) =>
   name === "Мороженое / Замороженные" ? "Замороженная продукция" : name;
 
-// ── Sortable item row ─────────────────────────────────────────────────────────
 function SortableItemRow({ item, onEdit, onDelete, onToggle }: {
   item: MenuItem; onEdit: (i: MenuItem) => void;
   onDelete: (id: string) => void; onToggle: (i: MenuItem) => void;
@@ -85,7 +84,6 @@ function SortableItemRow({ item, onEdit, onDelete, onToggle }: {
   );
 }
 
-// ── Sortable category ─────────────────────────────────────────────────────────
 function SortableCategoryBlock({ cat, items, onEditCatName, onToggleCat, onDeleteCat, onAddItem, onEditItem, onDeleteItem, onToggleItem, deletingCat }: {
   cat: Category; items: MenuItem[];
   onEditCatName: (c: Category) => void; onToggleCat: (c: Category) => void;
@@ -114,7 +112,6 @@ function SortableCategoryBlock({ cat, items, onEditCatName, onToggleCat, onDelet
         isDragging && "opacity-40 shadow-card-lg"
       )}
     >
-      {/* Шапка категории */}
       <div className="flex items-center gap-2 px-4 py-3 bg-neutral-50 border-b border-neutral-100">
         <button
           {...listeners} {...attributes}
@@ -155,7 +152,6 @@ function SortableCategoryBlock({ cat, items, onEditCatName, onToggleCat, onDelet
         </div>
       </div>
 
-      {/* Блюда внутри категории */}
       <SortableContext items={items.map(i => i.id)} strategy={verticalListSortingStrategy}>
         <div>
           {items.length === 0 && (
@@ -178,7 +174,6 @@ function SortableCategoryBlock({ cat, items, onEditCatName, onToggleCat, onDelet
   );
 }
 
-// ── Main page ─────────────────────────────────────────────────────────────────
 export default function MenuEditorPage() {
   const supabase = createClient();
   const [menuTypes,  setMenuTypes]  = useState<MenuType[]>([]);
@@ -222,7 +217,6 @@ export default function MenuEditorPage() {
     .filter(c => c.menu_type_id === activeType)
     .sort((a, b) => a.sort_order - b.sort_order);
 
-  // ── Drag end ────────────────────────────────────────────────────────────────
   async function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     setActiveId(null);
@@ -231,7 +225,6 @@ export default function MenuEditorPage() {
     const activeIdStr = String(active.id);
     const overIdStr   = String(over.id);
 
-    // Это категория?
     const isCat = categories.some(c => c.id === activeIdStr);
     if (isCat) {
       const oldIdx = visibleCats.findIndex(c => c.id === activeIdStr);
@@ -249,14 +242,12 @@ export default function MenuEditorPage() {
       return;
     }
 
-    // Это блюдо
     const activeItem = items.find(i => i.id === activeIdStr);
     if (!activeItem) return;
     const overItem = items.find(i => i.id === overIdStr);
     const catId = overItem ? overItem.category_id : activeItem.category_id;
 
     if (activeItem.category_id === catId) {
-      // Внутри одной категории
       const catItems = items.filter(i => i.category_id === catId).sort((a, b) => a.sort_order - b.sort_order);
       const oldIdx = catItems.findIndex(i => i.id === activeIdStr);
       const newIdx = catItems.findIndex(i => i.id === overIdStr);
@@ -271,14 +262,12 @@ export default function MenuEditorPage() {
       ));
       toast.success("Порядок сохранён");
     } else {
-      // Между категориями
       setItems(prev => prev.map(i => i.id === activeIdStr ? { ...i, category_id: catId } : i));
       await supabase.from("menu_items").update({ category_id: catId }).eq("id", activeIdStr);
       toast.success("Блюдо перемещено");
     }
   }
 
-  // ── Category actions ────────────────────────────────────────────────────────
   async function updateCatName(cat: Category) {
     await supabase.from("categories").update({ name: cat.name }).eq("id", cat.id);
     setCategories(p => p.map(c => c.id === cat.id ? { ...c, name: cat.name } : c));
@@ -303,7 +292,7 @@ export default function MenuEditorPage() {
 
   async function addCategory() {
     if (!newCatName.trim()) return;
-    const currentType = activeType; // сохраняем до fetchAll
+    const currentType = activeType;
     const slug = `${newCatName.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/gi, "")}-${Date.now()}`;
     const { data: newCat } = await supabase.from("categories")
       .insert({ name: newCatName.trim(), slug, menu_type_id: currentType, sort_order: visibleCats.length, is_active: true })
@@ -316,7 +305,6 @@ export default function MenuEditorPage() {
     toast.success("Категория добавлена");
   }
 
-  // ── Item actions ────────────────────────────────────────────────────────────
   function openAdd(catId: string) {
     setForm(EMPTY_FORM); setPhotoFile(null); setPhotoPreview(null);
     setModal({ open: true, item: null, catId });
@@ -375,7 +363,6 @@ export default function MenuEditorPage() {
         .insert({ ...payload, sort_order: items.filter(i => i.category_id === modal.catId).length })
         .select("id")
         .single();
-      // Автоматически добавляем блюдо во все города
       if (newItem?.id) {
         const { data: cities } = await supabase.from("cities").select("id");
         if (cities?.length) {
@@ -413,7 +400,6 @@ export default function MenuEditorPage() {
     </div>
   );
 
-  // Overlay — что показываем при перетаскивании
   const activeCategory = categories.find(c => c.id === activeId);
   const activeItem     = items.find(i => i.id === activeId);
 
@@ -434,7 +420,6 @@ export default function MenuEditorPage() {
         </div>
       </div>
 
-      {/* DnD для категорий */}
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
@@ -461,7 +446,6 @@ export default function MenuEditorPage() {
           </div>
         </SortableContext>
 
-        {/* Overlay — видимый призрак при перетаскивании */}
         <DragOverlay>
           {activeCategory && (
             <div className="card px-4 py-3 bg-white shadow-card-lg border-2 border-brand-400 opacity-95">
@@ -480,7 +464,6 @@ export default function MenuEditorPage() {
         </DragOverlay>
       </DndContext>
 
-      {/* Добавить категорию */}
       <div className="card p-4 border-2 border-dashed border-neutral-200 bg-transparent shadow-none">
         {addingCat ? (
           <div className="flex items-center gap-2">
@@ -498,7 +481,6 @@ export default function MenuEditorPage() {
         )}
       </div>
 
-      {/* Модалка блюда */}
       {modal.open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
           <div className="bg-white rounded-2xl shadow-card-lg w-full max-w-lg max-h-[90vh] flex flex-col animate-scale-in">

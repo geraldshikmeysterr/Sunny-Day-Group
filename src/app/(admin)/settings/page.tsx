@@ -63,7 +63,6 @@ export default function SettingsPage() {
   async function verify() {
     if (code.length !== 6) { toast.error("Введите 6-значный код"); return; }
     setVerifying(true);
-    // challengeAndVerify() из SDK дедлочится с onAuthStateChange — используем raw fetch
     const { data: sessionData } = await supabase.auth.getSession();
     const token = sessionData?.session?.access_token;
     if (!token) { toast.error("Сессия истекла"); setVerifying(false); return; }
@@ -100,7 +99,6 @@ export default function SettingsPage() {
     if (!unenrollConfirm || unenrollCode.length !== 6) return;
     setUnenrolling(true);
     try {
-      // supabase.auth.mfa.verify() дедлочится с onAuthStateChange — используем raw fetch
       const verifyRes = await fetch(
         `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/factors/${unenrollConfirm.factorId}/verify`,
         {
@@ -258,7 +256,6 @@ export default function SettingsPage() {
                 <button
                   onClick={async () => {
                     if (factorId) {
-                      // mfa.unenroll() deadlocks with onAuthStateChange — use raw fetch
                       const { data: s } = await supabase.auth.getSession();
                       const token = s?.session?.access_token;
                       if (token) {

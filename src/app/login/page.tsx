@@ -17,7 +17,6 @@ export default function LoginPage() {
   const [mfaStep, setMfaStep] = useState(false);
   const [mfaLoading, setMfaLoading] = useState(false);
 
-  // Restore MFA step only if user went through password step in this browser session
   useEffect(() => {
     if (!sessionStorage.getItem("mfa_in_progress")) return;
     async function checkPendingMfa() {

@@ -25,7 +25,6 @@ function useDropdown(open: boolean, calcPos: () => void, btnRef: React.RefObject
   }, [open, calcPos, btnRef, dropRef, setOpen]);
 }
 
-// Обычный select — одиночный выбор без галочек
 export function CustomSelect({ value, onChange, options, className, placeholder }: Readonly<{
   value: string; onChange: (v: string) => void;
   options: Option[]; className?: string; placeholder?: string;
@@ -85,7 +84,6 @@ export function CustomSelect({ value, onChange, options, className, placeholder 
   );
 }
 
-// Мульти-select с галочками — для выбора нескольких значений (Рестораны → города)
 export function MultiSelect({ values, onChange, options, className, placeholder }: Readonly<{
   values: string[]; onChange: (v: string[]) => void;
   options: Option[]; className?: string; placeholder?: string;

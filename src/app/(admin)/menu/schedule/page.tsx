@@ -30,7 +30,6 @@ export default function MenuSchedulePage() {
   const [activeType, setActiveType] = useState("");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
-  // saving — Set строк вместо одной строки, чтобы несколько кнопок работали одновременно
   const [saving, setSaving] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -56,7 +55,6 @@ export default function MenuSchedulePage() {
     init();
   }, []);
 
-  // Фикс: используем Set + всегда try/finally чтобы saving снимался
   async function toggleDay(itemId: string, day: number, currentDays: number[]) {
     const k = `${itemId}-${day}`;
     setSaving(p => new Set(p).add(k));
@@ -110,7 +108,6 @@ export default function MenuSchedulePage() {
         <p className="text-sm text-neutral-500 mt-1">Управляйте расписанием блюд по дням недели.</p>
       </div>
 
-      {/* Легенда */}
       <div className="card p-4 flex flex-wrap gap-4 text-sm">
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 rounded bg-success-50 border border-success-200 flex items-center justify-center"><Check size={12} className="text-success-600" /></div>
@@ -122,7 +119,6 @@ export default function MenuSchedulePage() {
         </div>
       </div>
 
-      {/* Фильтры — sticky */}
       <div className="card p-4 flex flex-wrap gap-3 items-center sticky top-4 z-20 bg-white shadow-card">
         <div className="flex gap-2">
           {menuTypes.map(t => (
@@ -139,7 +135,6 @@ export default function MenuSchedulePage() {
         </div>
       </div>
 
-      {/* Таблица */}
       <div className="overflow-hidden rounded-2xl border border-neutral-200 shadow-card">
         <div className="overflow-x-auto bg-white">
           <table className="w-full text-sm border-collapse">
@@ -153,7 +148,6 @@ export default function MenuSchedulePage() {
                     {d.name}
                   </th>
                 ))}
-                {/* Разделитель перед "Все" */}
                 <th className="px-3 py-3 text-center text-xs font-semibold text-neutral-400 border-l border-neutral-200" style={{ minWidth: 60 }}>
                   Все
                 </th>
@@ -203,7 +197,6 @@ export default function MenuSchedulePage() {
                             </td>
                           );
                         })}
-                        {/* Кнопка "все дни" с разделителем */}
                         <td className="px-3 py-3 text-center border-l border-neutral-200">
                           <button
                             onClick={() => toggleAllDays(item.id, days)}

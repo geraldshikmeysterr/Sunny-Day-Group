@@ -62,9 +62,29 @@ Two roles stored in Supabase DB:
 | `src/app/globals.css` | Component layer classes: `.btn-*`, `.input`, `.card`, `.table`, `.badge`, `.skeleton` |
 | `rls_policies.sql` | All Supabase RLS policies (apply in Supabase SQL Editor) |
 
+### MCP Database Access
+
+The `postgres` MCP server connects to the self-hosted Supabase PostgreSQL via SSH tunnel.
+
+**Connection:** `c:/solnechnyi-admin/.mcp.json` uses `localhost:6543` (supavisor port) — requires SSH tunnel to be active.
+
+**SSH tunnel** is configured as a Windows Scheduled Task ("Supabase SSH Tunnel") that runs at logon:
+```powershell
+# Runs automatically at login via Task Scheduler — no manual action needed
+ssh -L 6543:localhost:6543 root@<VPS_IP> -N
+```
+The task uses `-WindowStyle Hidden` so no window appears. SSH key auth is configured (no password prompt).
+
+To manually restart the tunnel:
+```powershell
+Start-ScheduledTask -TaskName "Supabase SSH Tunnel"
+```
+
+Port 6543 is NOT open publicly on the VPS firewall — accessible only through the SSH tunnel.
+
 ### Supabase Patterns
 
-- **Real-time:** Active orders page subscribes to `postgres_changes` for live order updates
+- **Real-time:** Active orders page subscribes to `postgres_changes` for live order updates. Realtime must be enabled for the `orders` table in Supabase Dashboard → Database → Replication.
 - **Server vs Client:** Import from `lib/supabase/server.ts` in Server Components and `lib/supabase/client.ts` in Client Components (`'use client'`)
 - **Auth:** Email/password via Supabase Auth; session managed via cookies in middleware
 - **Self-hosted:** Supabase runs on VPS `VPS_IP_REDACTED`; public URL is `https://supabase.shilmeyster.ru`

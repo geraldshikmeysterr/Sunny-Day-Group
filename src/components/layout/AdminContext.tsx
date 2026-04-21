@@ -10,7 +10,6 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const supabase = createClient();
-    // onAuthStateChange избегает Lock ошибки в отличие от getUser
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!session?.user) {
         setCtx({ isAdmin: false, cityId: null, loaded: true });

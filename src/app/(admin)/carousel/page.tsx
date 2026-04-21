@@ -36,7 +36,6 @@ const APP_TARGETS: { value: AppTarget; label: string }[] = [
   { value: "promo",    label: "Промокод" },
 ];
 
-// ── Sliding segmented control ─────────────────────────────────────────────────
 function SegmentedControl<T extends string>({
   value, onChange, options,
 }: {
@@ -50,7 +49,6 @@ function SegmentedControl<T extends string>({
 
   return (
     <div className="relative flex bg-neutral-200 rounded-xl overflow-hidden" style={{ height: "2.25rem" }}>
-      {/* sliding pill */}
       <div
         className="absolute inset-y-0 rounded-xl bg-brand-500 pointer-events-none"
         style={{
@@ -77,7 +75,6 @@ function SegmentedControl<T extends string>({
   );
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
 function parseActionUrl(url: string | null): {
   type: ActionType; menuType: MenuType; appTarget: AppTarget;
   categoryId: string; itemId: string; promoCode: string; externalUrl: string;
@@ -135,7 +132,6 @@ function actionLabel(url: string | null): string | null {
   return url;
 }
 
-// ── Sortable row ──────────────────────────────────────────────────────────────
 function SortableCard({ card, onEdit, onDelete, onToggle }: {
   card: Card; onEdit: (c: Card) => void; onDelete: (c: Card) => void; onToggle: (c: Card) => void;
 }) {
@@ -186,7 +182,6 @@ function SortableCard({ card, onEdit, onDelete, onToggle }: {
   function openEdit(c: Card) { onEdit(c); }
 }
 
-// ── Page ──────────────────────────────────────────────────────────────────────
 export default function CarouselPage() {
   const supabase = createClient();
   const [cards, setCards]       = useState<Card[]>([]);
@@ -197,7 +192,6 @@ export default function CarouselPage() {
   const [modal, setModal]       = useState<{ open: boolean; editing: Card | null }>({ open: false, editing: null });
   const [saving, setSaving]     = useState(false);
 
-  // form
   const [title, setTitle]         = useState("");
   const [isActive, setIsActive]   = useState(false);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -352,7 +346,6 @@ export default function CarouselPage() {
             </div>
 
             <div className="overflow-y-auto flex-1 p-6 space-y-4">
-              {/* Фото */}
               <div>
                 <label className="label">Фото</label>
                 <div
@@ -385,13 +378,11 @@ export default function CarouselPage() {
                 />
               </div>
 
-              {/* Название */}
               <div>
                 <label className="label">Название *</label>
                 <input value={title} onChange={e => setTitle(e.target.value)} className="input" placeholder="Название карточки" autoComplete="off" />
               </div>
 
-              {/* Кнопка «Подробнее» */}
               <div className="space-y-3">
                 <label className="label">Кнопка «Подробнее»</label>
 
@@ -417,7 +408,6 @@ export default function CarouselPage() {
 
                 {actionType === "app" && (
                   <div className="space-y-3">
-                    {/* Тип меню */}
                     <SegmentedControl
                       value={menuType}
                       onChange={setMenuType}
@@ -427,7 +417,6 @@ export default function CarouselPage() {
                       ]}
                     />
 
-                    {/* Раздел */}
                     <CustomSelect
                       value={appTarget}
                       onChange={v => setAppTarget(v as AppTarget)}
@@ -459,7 +448,6 @@ export default function CarouselPage() {
                 )}
               </div>
 
-              {/* Активна */}
               <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <input type="checkbox" checked={isActive} onChange={e => setIsActive(e.target.checked)} className="w-4 h-4 rounded accent-brand-500" />
                 Показывать в карусели
