@@ -38,11 +38,11 @@ const APP_TARGETS: { value: AppTarget; label: string }[] = [
 
 function SegmentedControl<T extends string>({
   value, onChange, options,
-}: {
+}: Readonly<{
   value: T;
   onChange: (v: T) => void;
   options: { value: T; label: string }[];
-}) {
+}>) {
   const count   = options.length;
   const idx     = options.findIndex(o => o.value === value);
   const pct     = idx * 100;
@@ -132,9 +132,9 @@ function actionLabel(url: string | null): string | null {
   return url;
 }
 
-function SortableCard({ card, onEdit, onDelete, onToggle }: {
+function SortableCard({ card, onEdit, onDelete, onToggle }: Readonly<{
   card: Card; onEdit: (c: Card) => void; onDelete: (c: Card) => void; onToggle: (c: Card) => void;
-}) {
+}>) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: card.id });
   const label = actionLabel(card.action_url);
 
@@ -316,8 +316,8 @@ export default function CarouselPage() {
       <div className="card overflow-hidden">
         {loading && (
           <div className="divide-y divide-neutral-100">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-4 px-4 py-3">
+            {Array.from({ length: 3 }, (_, i) => i).map(i => (
+              <div key={`sk-${i}`} className="flex items-center gap-4 px-4 py-3">
                 <div className="skeleton w-5 h-5 rounded" />
                 <div className="skeleton w-20 h-20 rounded-xl shrink-0" />
                 <div className="skeleton h-4 flex-1 rounded" />
@@ -347,9 +347,10 @@ export default function CarouselPage() {
 
             <div className="overflow-y-auto flex-1 p-6 space-y-4">
               <div>
-                <label className="label">Фото</label>
+                <label htmlFor="carousel-file" className="label">Фото</label>
                 <div
                   onClick={() => fileInputRef.current?.click()}
+                  role="button" tabIndex={0} onKeyDown={e => e.key === 'Enter' && fileInputRef.current?.click()}
                   className={cn(
                     "relative w-full h-44 rounded-xl cursor-pointer transition-colors flex items-center justify-center overflow-hidden",
                     photoPreview
@@ -366,7 +367,7 @@ export default function CarouselPage() {
                       </div>
                   }
                 </div>
-                <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
+                <input id="carousel-file" ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
                   onChange={async e => {
                     const f = e.target.files?.[0];
                     if (!f) return;
@@ -379,12 +380,12 @@ export default function CarouselPage() {
               </div>
 
               <div>
-                <label className="label">Название *</label>
-                <input value={title} onChange={e => setTitle(e.target.value)} className="input" placeholder="Название карточки" autoComplete="off" />
+                <label htmlFor="carousel-title" className="label">Название *</label>
+                <input id="carousel-title" value={title} onChange={e => setTitle(e.target.value)} className="input" placeholder="Название карточки" autoComplete="off" />
               </div>
 
               <div className="space-y-3">
-                <label className="label">Кнопка «Подробнее»</label>
+                <p className="label">Кнопка «Подробнее»</p>
 
                 <SegmentedControl
                   value={actionType}

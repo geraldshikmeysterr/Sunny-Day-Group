@@ -2,7 +2,7 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { AuthGuard } from "@/components/layout/AuthGuard";
 import { AdminProvider } from "@/components/layout/AdminContext";
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+export default function AdminLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <AuthGuard>
       <AdminProvider>

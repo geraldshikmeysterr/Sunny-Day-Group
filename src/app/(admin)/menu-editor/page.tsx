@@ -38,10 +38,10 @@ const EMPTY_FORM = {
 const getTypeName = (name: string) =>
   name === "Мороженое / Замороженные" ? "Замороженная продукция" : name;
 
-function SortableItemRow({ item, onEdit, onDelete, onToggle }: {
+function SortableItemRow({ item, onEdit, onDelete, onToggle }: Readonly<{
   item: MenuItem; onEdit: (i: MenuItem) => void;
   onDelete: (id: string) => void; onToggle: (i: MenuItem) => void;
-}) {
+}>) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: item.id });
 
@@ -84,13 +84,13 @@ function SortableItemRow({ item, onEdit, onDelete, onToggle }: {
   );
 }
 
-function SortableCategoryBlock({ cat, items, onEditCatName, onToggleCat, onDeleteCat, onAddItem, onEditItem, onDeleteItem, onToggleItem, deletingCat }: {
+function SortableCategoryBlock({ cat, items, onEditCatName, onToggleCat, onDeleteCat, onAddItem, onEditItem, onDeleteItem, onToggleItem, deletingCat }: Readonly<{
   cat: Category; items: MenuItem[];
   onEditCatName: (c: Category) => void; onToggleCat: (c: Category) => void;
   onDeleteCat: (c: Category) => void; onAddItem: (catId: string) => void;
   onEditItem: (i: MenuItem) => void; onDeleteItem: (id: string) => void;
   onToggleItem: (i: MenuItem) => void; deletingCat: string | null;
-}) {
+}>) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: cat.id });
 
@@ -98,7 +98,7 @@ function SortableCategoryBlock({ cat, items, onEditCatName, onToggleCat, onDelet
   const [nameVal, setNameVal] = useState(cat.name);
 
   function commitName() {
-    if (nameVal.trim() && nameVal !== cat.name) onEditCatName({ ...cat, name: nameVal.trim() });
+    if (nameVal.trim() && nameVal !== cat.name) { onEditCatName({ ...cat, name: nameVal.trim() }); }
     setEditingName(false);
   }
 
@@ -283,7 +283,7 @@ export default function MenuEditorPage() {
     const count = items.filter(i => i.category_id === cat.id).length;
     if (!confirm(count > 0 ? `Удалить категорию вместе с ${count} блюдами?` : "Удалить категорию?")) return;
     setDeletingCat(cat.id);
-    if (count > 0) await supabase.from("menu_items").delete().eq("category_id", cat.id);
+    if (count > 0) { await supabase.from("menu_items").delete().eq("category_id", cat.id); }
     await supabase.from("categories").delete().eq("id", cat.id);
     await fetchAll();
     setDeletingCat(null);
@@ -293,7 +293,7 @@ export default function MenuEditorPage() {
   async function addCategory() {
     if (!newCatName.trim()) return;
     const currentType = activeType;
-    const slug = `${newCatName.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/gi, "")}-${Date.now()}`;
+    const slug = `${newCatName.toLowerCase().replaceAll(/\s+/g, "-").replaceAll(/[^a-z0-9-]/gi, "")}-${Date.now()}`;
     const { data: newCat } = await supabase.from("categories")
       .insert({ name: newCatName.trim(), slug, menu_type_id: currentType, sort_order: visibleCats.length, is_active: true })
       .select().single();
@@ -343,16 +343,16 @@ export default function MenuEditorPage() {
     }
     const payload = {
       name: form.name, description: form.description || null,
-      weight_grams: form.weight_grams ? parseInt(form.weight_grams) : null,
-      calories: form.calories ? parseFloat(form.calories) : null,
-      proteins: form.proteins ? parseFloat(form.proteins) : null,
-      fats: form.fats ? parseFloat(form.fats) : null,
-      carbs: form.carbs ? parseFloat(form.carbs) : null,
+      weight_grams: form.weight_grams ? Number.parseInt(form.weight_grams) : null,
+      calories: form.calories ? Number.parseFloat(form.calories) : null,
+      proteins: form.proteins ? Number.parseFloat(form.proteins) : null,
+      fats: form.fats ? Number.parseFloat(form.fats) : null,
+      carbs: form.carbs ? Number.parseFloat(form.carbs) : null,
       image_url: imageUrl, is_global_active: form.is_global_active,
       category_id: modal.catId,
       active_from: form.active_from || null,
       active_until: form.active_until || null,
-      box_quantity: form.box_quantity ? parseInt(form.box_quantity) : null,
+      box_quantity: form.box_quantity ? Number.parseInt(form.box_quantity) : null,
     };
     if (modal.item) {
       await supabase.from("menu_items").update(payload).eq("id", modal.item.id);
@@ -394,8 +394,8 @@ export default function MenuEditorPage() {
   if (loading) return (
     <div className="p-6 max-w-3xl mx-auto space-y-3">
       <div className="skeleton h-10 w-48 mb-6" />
-      {Array.from({ length: 3 }).map((_, i) => (
-        <div key={i} className="card p-5"><div className="skeleton h-5 w-32 mb-3" /><div className="skeleton h-4 w-full" /></div>
+      {Array.from({ length: 3 }, (_, i) => i).map(i => (
+        <div key={`sk-${i}`} className="card p-5"><div className="skeleton h-5 w-32 mb-3" /><div className="skeleton h-4 w-full" /></div>
       ))}
     </div>
   );
@@ -469,7 +469,7 @@ export default function MenuEditorPage() {
           <div className="flex items-center gap-2">
             <input value={newCatName} onChange={e => setNewCatName(e.target.value)}
               placeholder="Название категории" autoFocus
-              onKeyDown={e => { if (e.key === "Enter") addCategory(); if (e.key === "Escape") { setAddingCat(false); setNewCatName(""); } }}
+              onKeyDown={e => { if (e.key === "Enter") { addCategory(); } if (e.key === "Escape") { setAddingCat(false); setNewCatName(""); } }}
               className="input flex-1" />
             <button onClick={addCategory} disabled={!newCatName.trim()} className="btn-primary btn-sm"><Check size={13} /> Добавить</button>
             <button onClick={() => { setAddingCat(false); setNewCatName(""); }} className="btn-secondary btn-sm"><X size={13} /></button>
@@ -490,8 +490,9 @@ export default function MenuEditorPage() {
             </div>
             <div className="overflow-y-auto flex-1 p-6 space-y-4">
               <div>
-                <label className="label">Фото</label>
+                <label htmlFor="item-file" className="label">Фото</label>
                 <div onClick={() => fileRef.current?.click()}
+                  role="button" tabIndex={0} onKeyDown={e => e.key === 'Enter' && fileRef.current?.click()}
                   className="border-2 border-dashed border-neutral-300 rounded-xl p-4 flex items-center gap-4 cursor-pointer hover:border-brand-400 hover:bg-brand-50/30 transition-all">
                   {photoPreview
                     ? <img src={photoPreview} className="w-16 h-16 object-cover rounded-lg shrink-0" alt="" />
@@ -502,7 +503,7 @@ export default function MenuEditorPage() {
                     <p className="text-xs text-neutral-400">JPEG, PNG, WebP · до 5 МБ</p>
                   </div>
                 </div>
-                <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
+                <input id="item-file" ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
                   onChange={async e => {
                     const f = e.target.files?.[0];
                     if (!f) return;
@@ -512,9 +513,9 @@ export default function MenuEditorPage() {
                     setForm(p => ({ ...p, image_url: "" }));
                   }} />
               </div>
-              <div><label className="label">Название *</label><input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} className="input" placeholder="Название блюда" autoComplete="off" /></div>
-              <div><label className="label">Цена (руб.)</label><p className="text-xs text-neutral-400 -mt-0.5 mb-1">Устанавливается в разделе «По городам»</p></div>
-              <div><label className="label">Описание</label><textarea value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} rows={3} className="textarea" placeholder="Описание блюда" /></div>
+              <div><label htmlFor="item-name" className="label">Название *</label><input id="item-name" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} className="input" placeholder="Название блюда" autoComplete="off" /></div>
+              <div><p className="label">Цена (руб.)</p><p className="text-xs text-neutral-400 -mt-0.5 mb-1">Устанавливается в разделе «По городам»</p></div>
+              <div><label htmlFor="item-desc" className="label">Описание</label><textarea id="item-desc" value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} rows={3} className="textarea" placeholder="Описание блюда" /></div>
               <div>
                 <p className="label mb-2">КБЖУ</p>
                 <div className="grid grid-cols-4 gap-2">
@@ -530,12 +531,12 @@ export default function MenuEditorPage() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="label">Вес (г)</label>
-                  <input type="number" placeholder="Вес блюда" value={form.weight_grams} onChange={e => setForm(p => ({ ...p, weight_grams: e.target.value }))} className="input" />
+                  <label htmlFor="item-weight" className="label">Вес (г)</label>
+                  <input id="item-weight" type="number" placeholder="Вес блюда" value={form.weight_grams} onChange={e => setForm(p => ({ ...p, weight_grams: e.target.value }))} className="input" />
                 </div>
                 <div>
-                  <label className="label">Количество в коробке</label>
-                  <input type="number" placeholder="Укажите шт. для коробки" value={form.box_quantity} onChange={e => setForm(p => ({ ...p, box_quantity: e.target.value }))} className="input" min={1} />
+                  <label htmlFor="item-box-qty" className="label">Количество в коробке</label>
+                  <input id="item-box-qty" type="number" placeholder="Укажите шт. для коробки" value={form.box_quantity} onChange={e => setForm(p => ({ ...p, box_quantity: e.target.value }))} className="input" min={1} />
                 </div>
               </div>
               <div className="border-t border-neutral-200 pt-3">
@@ -543,12 +544,12 @@ export default function MenuEditorPage() {
                 <p className="text-xs text-neutral-400 mb-3">Блюдо будет автоматически включаться и выключаться по времени. Оставьте пустым — всегда активно.</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs text-neutral-500 block mb-1">Начало</label>
-                    <input type="time" value={form.active_from} onChange={e => setForm(p => ({ ...p, active_from: e.target.value }))} className="input text-sm" />
+                    <label htmlFor="item-active-from" className="text-xs text-neutral-500 block mb-1">Начало</label>
+                    <input id="item-active-from" type="time" value={form.active_from} onChange={e => setForm(p => ({ ...p, active_from: e.target.value }))} className="input text-sm" />
                   </div>
                   <div>
-                    <label className="text-xs text-neutral-500 block mb-1">Конец</label>
-                    <input type="time" value={form.active_until} onChange={e => setForm(p => ({ ...p, active_until: e.target.value }))} className="input text-sm" />
+                    <label htmlFor="item-active-until" className="text-xs text-neutral-500 block mb-1">Конец</label>
+                    <input id="item-active-until" type="time" value={form.active_until} onChange={e => setForm(p => ({ ...p, active_until: e.target.value }))} className="input text-sm" />
                   </div>
                 </div>
                 {(form.active_from || form.active_until) && (

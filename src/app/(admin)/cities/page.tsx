@@ -77,7 +77,7 @@ export default function CitiesPage() {
     if (addForm.operator_password.length < 8) {
       setError("Пароль должен быть не менее 8 символов"); return;
     }
-    if (!/[A-Z]/.test(addForm.operator_password) || !/[0-9]/.test(addForm.operator_password)) {
+    if (!/[A-Z]/.test(addForm.operator_password) || !/\d/.test(addForm.operator_password)) {
       setError("Пароль должен содержать минимум одну заглавную букву и одну цифру"); return;
     }
     setSaving(true); setError("");
@@ -134,7 +134,7 @@ export default function CitiesPage() {
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editForm.op_email)) {
           setError("Некорректный формат email оператора"); setSaving(false); return;
         }
-        if (editForm.op_password.length < 8 || !/[A-Z]/.test(editForm.op_password) || !/[0-9]/.test(editForm.op_password)) {
+        if (editForm.op_password.length < 8 || !/[A-Z]/.test(editForm.op_password) || !/\d/.test(editForm.op_password)) {
           setError("Пароль: минимум 8 символов, одна заглавная буква и одна цифра"); setSaving(false); return;
         }
         const oldOp = operators[editModal.id];
@@ -187,7 +187,6 @@ export default function CitiesPage() {
   }
 
   function openEdit(city: City) {
-    const op = operators[city.id];
     setEditForm({ name: city.name, region: city.region ?? "", phone: city.phone ?? "", email: city.email ?? "", telegram: city.telegram ?? "", instagram: city.instagram ?? "", vk: city.vk ?? "", max: city.max_messenger ?? "", op_email: "", op_password: "", showPw: false });
     setEditModal(city); setError("");
   }
@@ -205,8 +204,8 @@ export default function CitiesPage() {
       </div>
 
       {loading ? (
-        <div className="space-y-2">{Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="card p-4"><div className="skeleton h-5 w-32 mb-2" /><div className="skeleton h-4 w-48" /></div>
+        <div className="space-y-2">{Array.from({ length: 3 }, (_, i) => i).map(i => (
+          <div key={`sk-${i}`} className="card p-4"><div className="skeleton h-5 w-32 mb-2" /><div className="skeleton h-4 w-48" /></div>
         ))}</div>
       ) : (
         <div className="card overflow-hidden">
@@ -276,12 +275,12 @@ export default function CitiesPage() {
             <div className="overflow-y-auto flex-1 p-6 space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2">
-                  <label className="label">Название города *</label>
-                  <input value={addForm.city_name} onChange={e => setAddForm(p => ({...p, city_name: e.target.value}))} className="input" placeholder="Новосибирск"/>
+                  <label htmlFor="add-city-name" className="label">Название города *</label>
+                  <input id="add-city-name" value={addForm.city_name} onChange={e => setAddForm(p => ({...p, city_name: e.target.value}))} className="input" placeholder="Новосибирск"/>
                 </div>
                 <div className="col-span-2">
-                  <label className="label">Регион</label>
-                  <input value={addForm.city_region} onChange={e => setAddForm(p => ({...p, city_region: e.target.value}))} className="input" placeholder="Необязательно"/>
+                  <label htmlFor="add-city-region" className="label">Регион</label>
+                  <input id="add-city-region" value={addForm.city_region} onChange={e => setAddForm(p => ({...p, city_region: e.target.value}))} className="input" placeholder="Необязательно"/>
                 </div>
               </div>
 
@@ -289,32 +288,32 @@ export default function CitiesPage() {
                 <p className="text-sm font-semibold text-neutral-700 mb-3">Контакты города</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="label">Телефон</label>
+                    <label htmlFor="add-city-phone" className="label">Телефон</label>
                     <div className="relative"><Phone size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"/>
-                      <input value={addForm.city_phone} onChange={e => setAddForm(p => ({...p, city_phone: e.target.value}))} className="input pl-8 text-sm" placeholder="+7 (999) 000-00-00"/>
+                      <input id="add-city-phone" value={addForm.city_phone} onChange={e => setAddForm(p => ({...p, city_phone: e.target.value}))} className="input pl-8 text-sm" placeholder="+7 (999) 000-00-00"/>
                     </div>
                   </div>
                   <div>
-                    <label className="label">Email</label>
+                    <label htmlFor="add-city-email" className="label">Email</label>
                     <div className="relative"><Mail size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"/>
-                      <input type="email" value={addForm.city_email} onChange={e => setAddForm(p => ({...p, city_email: e.target.value}))} className="input pl-8 text-sm" placeholder="city@operator.ru"/>
+                      <input id="add-city-email" type="email" value={addForm.city_email} onChange={e => setAddForm(p => ({...p, city_email: e.target.value}))} className="input pl-8 text-sm" placeholder="city@operator.ru"/>
                     </div>
                   </div>
                   <div>
-                    <label className="label">Telegram</label>
-                    <input value={addForm.city_telegram} onChange={e => setAddForm(p => ({...p, city_telegram: e.target.value}))} className="input text-sm" placeholder="@solnechniy_den"/>
+                    <label htmlFor="add-city-telegram" className="label">Telegram</label>
+                    <input id="add-city-telegram" value={addForm.city_telegram} onChange={e => setAddForm(p => ({...p, city_telegram: e.target.value}))} className="input text-sm" placeholder="@solnechniy_den"/>
                   </div>
                   <div>
-                    <label className="label">Instagram</label>
-                    <input value={addForm.city_instagram} onChange={e => setAddForm(p => ({...p, city_instagram: e.target.value}))} className="input text-sm" placeholder="@solnechniy_den"/>
+                    <label htmlFor="add-city-instagram" className="label">Instagram</label>
+                    <input id="add-city-instagram" value={addForm.city_instagram} onChange={e => setAddForm(p => ({...p, city_instagram: e.target.value}))} className="input text-sm" placeholder="@solnechniy_den"/>
                   </div>
                   <div>
-                    <label className="label">ВКонтакте</label>
-                    <input value={addForm.city_vk} onChange={e => setAddForm(p => ({...p, city_vk: e.target.value}))} className="input text-sm" placeholder="https://vk.com/..."/>
+                    <label htmlFor="add-city-vk" className="label">ВКонтакте</label>
+                    <input id="add-city-vk" value={addForm.city_vk} onChange={e => setAddForm(p => ({...p, city_vk: e.target.value}))} className="input text-sm" placeholder="https://vk.com/..."/>
                   </div>
                   <div>
-                    <label className="label">Max</label>
-                    <input value={addForm.city_max} onChange={e => setAddForm(p => ({...p, city_max: e.target.value}))} className="input text-sm" placeholder="@solnechniy_den"/>
+                    <label htmlFor="add-city-max" className="label">Max</label>
+                    <input id="add-city-max" value={addForm.city_max} onChange={e => setAddForm(p => ({...p, city_max: e.target.value}))} className="input text-sm" placeholder="@solnechniy_den"/>
                   </div>
                 </div>
               </div>
@@ -323,13 +322,13 @@ export default function CitiesPage() {
                 <p className="text-sm font-semibold text-neutral-700 mb-3">Оператор города</p>
                 <div className="space-y-3">
                   <div>
-                    <label className="label">Email *</label>
-                    <input type="email" value={addForm.operator_email} onChange={e => setAddForm(p => ({...p, operator_email: e.target.value}))} className="input" placeholder="city@operator.ru" autoComplete="new-password"/>
+                    <label htmlFor="add-op-email" className="label">Email *</label>
+                    <input id="add-op-email" type="email" value={addForm.operator_email} onChange={e => setAddForm(p => ({...p, operator_email: e.target.value}))} className="input" placeholder="city@operator.ru" autoComplete="new-password"/>
                   </div>
                   <div>
-                    <label className="label">Пароль *</label>
+                    <label htmlFor="add-op-password" className="label">Пароль *</label>
                     <div className="relative">
-                      <input type={addForm.showPw ? "text" : "password"} value={addForm.operator_password} onChange={e => setAddForm(p => ({...p, operator_password: e.target.value}))} className="input pr-20" autoComplete="new-password" placeholder="Минимум 8 символов"/>
+                      <input id="add-op-password" type={addForm.showPw ? "text" : "password"} value={addForm.operator_password} onChange={e => setAddForm(p => ({...p, operator_password: e.target.value}))} className="input pr-20" autoComplete="new-password" placeholder="Минимум 8 символов"/>
                       <button type="button" onClick={() => setAddForm(p => ({...p, showPw: !p.showPw}))} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-neutral-400 hover:text-neutral-600">{addForm.showPw ? "Скрыть" : "Показать"}</button>
                     </div>
                   </div>
@@ -357,12 +356,12 @@ export default function CitiesPage() {
             <div className="overflow-y-auto flex-1 p-6 space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="label">Название города *</label>
-                  <input value={editForm.name} onChange={e => setEditForm(p => ({...p, name: e.target.value}))} className="input" placeholder="Новосибирск"/>
+                  <label htmlFor="edit-city-name" className="label">Название города *</label>
+                  <input id="edit-city-name" value={editForm.name} onChange={e => setEditForm(p => ({...p, name: e.target.value}))} className="input" placeholder="Новосибирск"/>
                 </div>
                 <div>
-                  <label className="label">Регион</label>
-                  <input value={editForm.region} onChange={e => setEditForm(p => ({...p, region: e.target.value}))} className="input" placeholder="Необязательно"/>
+                  <label htmlFor="edit-city-region" className="label">Регион</label>
+                  <input id="edit-city-region" value={editForm.region} onChange={e => setEditForm(p => ({...p, region: e.target.value}))} className="input" placeholder="Необязательно"/>
                 </div>
               </div>
 
@@ -370,32 +369,32 @@ export default function CitiesPage() {
                 <p className="text-sm font-semibold text-neutral-700 mb-3">Контакты города</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="label">Телефон</label>
+                    <label htmlFor="edit-city-phone" className="label">Телефон</label>
                     <div className="relative"><Phone size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"/>
-                      <input value={editForm.phone} onChange={e => setEditForm(p => ({...p, phone: e.target.value}))} className="input pl-8 text-sm" placeholder="+7 (999) 000-00-00"/>
+                      <input id="edit-city-phone" value={editForm.phone} onChange={e => setEditForm(p => ({...p, phone: e.target.value}))} className="input pl-8 text-sm" placeholder="+7 (999) 000-00-00"/>
                     </div>
                   </div>
                   <div>
-                    <label className="label">Email</label>
+                    <label htmlFor="edit-city-email" className="label">Email</label>
                     <div className="relative"><Mail size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"/>
-                      <input type="email" value={editForm.email} onChange={e => setEditForm(p => ({...p, email: e.target.value}))} className="input pl-8 text-sm" placeholder="city@operator.ru"/>
+                      <input id="edit-city-email" type="email" value={editForm.email} onChange={e => setEditForm(p => ({...p, email: e.target.value}))} className="input pl-8 text-sm" placeholder="city@operator.ru"/>
                     </div>
                   </div>
                   <div>
-                    <label className="label">Telegram</label>
-                    <input value={editForm.telegram} onChange={e => setEditForm(p => ({...p, telegram: e.target.value}))} className="input text-sm" placeholder="@solnechniy_den"/>
+                    <label htmlFor="edit-city-telegram" className="label">Telegram</label>
+                    <input id="edit-city-telegram" value={editForm.telegram} onChange={e => setEditForm(p => ({...p, telegram: e.target.value}))} className="input text-sm" placeholder="@solnechniy_den"/>
                   </div>
                   <div>
-                    <label className="label">Instagram</label>
-                    <input value={editForm.instagram} onChange={e => setEditForm(p => ({...p, instagram: e.target.value}))} className="input text-sm" placeholder="@solnechniy_den"/>
+                    <label htmlFor="edit-city-instagram" className="label">Instagram</label>
+                    <input id="edit-city-instagram" value={editForm.instagram} onChange={e => setEditForm(p => ({...p, instagram: e.target.value}))} className="input text-sm" placeholder="@solnechniy_den"/>
                   </div>
                   <div>
-                    <label className="label">ВКонтакте</label>
-                    <input value={editForm.vk} onChange={e => setEditForm(p => ({...p, vk: e.target.value}))} className="input text-sm" placeholder="https://vk.com/..."/>
+                    <label htmlFor="edit-city-vk" className="label">ВКонтакте</label>
+                    <input id="edit-city-vk" value={editForm.vk} onChange={e => setEditForm(p => ({...p, vk: e.target.value}))} className="input text-sm" placeholder="https://vk.com/..."/>
                   </div>
                   <div>
-                    <label className="label">Max</label>
-                    <input value={editForm.max} onChange={e => setEditForm(p => ({...p, max: e.target.value}))} className="input text-sm" placeholder="@solnechniy_den"/>
+                    <label htmlFor="edit-city-max" className="label">Max</label>
+                    <input id="edit-city-max" value={editForm.max} onChange={e => setEditForm(p => ({...p, max: e.target.value}))} className="input text-sm" placeholder="@solnechniy_den"/>
                   </div>
                 </div>
               </div>
@@ -410,13 +409,13 @@ export default function CitiesPage() {
                 <p className="text-xs text-neutral-400 mb-3">Оставьте пустым — оператор останется прежним</p>
                 <div className="space-y-3">
                   <div>
-                    <label className="label">Email нового оператора</label>
-                    <input type="email" value={editForm.op_email} onChange={e => setEditForm(p => ({...p, op_email: e.target.value}))} className="input" placeholder="city@operator.ru" autoComplete="off"/>
+                    <label htmlFor="edit-op-email" className="label">Email нового оператора</label>
+                    <input id="edit-op-email" type="email" value={editForm.op_email} onChange={e => setEditForm(p => ({...p, op_email: e.target.value}))} className="input" placeholder="city@operator.ru" autoComplete="off"/>
                   </div>
                   <div>
-                    <label className="label">Пароль</label>
+                    <label htmlFor="edit-op-password" className="label">Пароль</label>
                     <div className="relative">
-                      <input type={editForm.showPw ? "text" : "password"} value={editForm.op_password} onChange={e => setEditForm(p => ({...p, op_password: e.target.value}))} className="input pr-20"/>
+                      <input id="edit-op-password" type={editForm.showPw ? "text" : "password"} value={editForm.op_password} onChange={e => setEditForm(p => ({...p, op_password: e.target.value}))} className="input pr-20"/>
                       <button type="button" onClick={() => setEditForm(p => ({...p, showPw: !p.showPw}))} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-neutral-400 hover:text-neutral-600">{editForm.showPw ? "Скрыть" : "Показать"}</button>
                     </div>
                   </div>

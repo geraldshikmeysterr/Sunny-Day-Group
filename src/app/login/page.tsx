@@ -89,30 +89,7 @@ export default function LoginPage() {
           <p className="text-sm text-white/70">Панель управления</p>
         </div>
 
-        {!mfaStep ? (
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <label className="block text-xs font-medium text-white/80 mb-1">Email</label>
-              <input type="email" value={email} onChange={e => setEmail(e.target.value)}
-                placeholder="operator@city.ru" required
-                className="w-full px-3 py-2.5 rounded-xl text-sm bg-white/15 text-white placeholder-white/40 border border-white/25 outline-none focus:bg-white/25 focus:border-white/50 transition" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-white/80 mb-1">Пароль</label>
-              <input type="password" value={password} onChange={e => setPassword(e.target.value)}
-                placeholder="••••••••" required
-                className="w-full px-3 py-2.5 rounded-xl text-sm bg-white/15 text-white placeholder-white/40 border border-white/25 outline-none focus:bg-white/25 focus:border-white/50 transition" />
-            </div>
-            {error && (
-              <div className="text-sm text-white bg-white/20 px-3 py-2.5 rounded-xl">{error}</div>
-            )}
-            <button type="submit" disabled={loading}
-              className="w-full flex items-center justify-center gap-2 bg-white text-orange-500 font-semibold text-sm py-2.5 rounded-xl hover:bg-white/90 transition mt-2 disabled:opacity-60">
-              {loading && <Loader2 size={14} className="animate-spin" />}
-              {loading ? "Вход..." : "Войти"}
-            </button>
-          </form>
-        ) : (
+        {mfaStep ? (
           <form onSubmit={handleMfa} className="space-y-4">
             <div className="text-center space-y-1">
               <p className="text-sm font-medium text-white">Двухфакторная аутентификация</p>
@@ -140,6 +117,29 @@ export default function LoginPage() {
             <button type="button" onClick={() => { sessionStorage.removeItem("mfa_in_progress"); setMfaStep(false); setMfaCode(""); setError(""); }}
               className="w-full text-sm text-white/70 hover:text-white py-2 transition">
               Назад
+            </button>
+          </form>
+        ) : (
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <label htmlFor="login-email" className="block text-xs font-medium text-white/80 mb-1">Email</label>
+              <input id="login-email" type="email" value={email} onChange={e => setEmail(e.target.value)}
+                placeholder="operator@city.ru" required
+                className="w-full px-3 py-2.5 rounded-xl text-sm bg-white/15 text-white placeholder-white/40 border border-white/25 outline-none focus:bg-white/25 focus:border-white/50 transition" />
+            </div>
+            <div>
+              <label htmlFor="login-password" className="block text-xs font-medium text-white/80 mb-1">Пароль</label>
+              <input id="login-password" type="password" value={password} onChange={e => setPassword(e.target.value)}
+                placeholder="••••••••" required
+                className="w-full px-3 py-2.5 rounded-xl text-sm bg-white/15 text-white placeholder-white/40 border border-white/25 outline-none focus:bg-white/25 focus:border-white/50 transition" />
+            </div>
+            {error && (
+              <div className="text-sm text-white bg-white/20 px-3 py-2.5 rounded-xl">{error}</div>
+            )}
+            <button type="submit" disabled={loading}
+              className="w-full flex items-center justify-center gap-2 bg-white text-orange-500 font-semibold text-sm py-2.5 rounded-xl hover:bg-white/90 transition mt-2 disabled:opacity-60">
+              {loading && <Loader2 size={14} className="animate-spin" />}
+              {loading ? "Вход..." : "Войти"}
             </button>
           </form>
         )}

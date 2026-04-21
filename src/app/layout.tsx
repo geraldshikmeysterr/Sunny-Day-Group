@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   title: "Солнечный день — Панель управления",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   headers();
 
   return (

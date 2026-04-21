@@ -92,7 +92,7 @@ export default function ActiveOrdersPage() {
           <table className="table">
             <thead><tr><th>Заказ</th><th>Клиент</th>{isAdmin && <th>Город</th>}<th>Адрес</th><th>Состав</th><th>Комментарий</th><th>Сумма</th><th>Статус</th><th>Дата</th><th></th></tr></thead>
             <tbody>
-              {loading && Array.from({length:5}).map((_,i)=><tr key={i}>{Array.from({length:isAdmin?10:9}).map((_,j)=><td key={j}><div className="skeleton h-4 w-full"/></td>)}</tr>)}
+              {loading && Array.from({length:5},(_,i)=>i).map(i=><tr key={`sk-${i}`}>{Array.from({length:isAdmin?10:9},(_,j)=>j).map(j=><td key={`sk-col-${j}`}><div className="skeleton h-4 w-full"/></td>)}</tr>)}
               {!loading && filtered.map(order => {
                 const c = ORDER_STATUS_COLORS[order.status as OrderStatus];
                 const nextStatus = ALLOWED_TRANSITIONS[order.status as OrderStatus].find(s => s !== "cancelled");

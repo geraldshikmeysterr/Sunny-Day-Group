@@ -40,7 +40,7 @@ export default function RestaurantsPage() {
 
   async function save() {
     setSaving(true);
-    const payload = {name:form.name,address:form.address,phone:form.phone||null,working_hours:form.working_hours||null,lat:form.lat?parseFloat(form.lat):null,lng:form.lng?parseFloat(form.lng):null,is_active:form.is_active,city_id:form.city_id||opCityId};
+    const payload = {name:form.name,address:form.address,phone:form.phone||null,working_hours:form.working_hours||null,lat:form.lat?Number.parseFloat(form.lat):null,lng:form.lng?Number.parseFloat(form.lng):null,is_active:form.is_active,city_id:form.city_id||opCityId};
     if (modal.editing) await supabase.from("restaurants").update(payload).eq("id",modal.editing.id);
     else await supabase.from("restaurants").insert(payload);
     toast.success(modal.editing?"Ресторан обновлён":"Ресторан добавлен");
@@ -69,7 +69,7 @@ export default function RestaurantsPage() {
         <table className="table">
           <thead><tr><th>Ресторан</th>{isAdmin&&<th>Город</th>}<th>Адрес</th><th>Телефон</th><th>Часы</th><th>Статус</th><th></th></tr></thead>
           <tbody>
-            {loading&&Array.from({length:4}).map((_,i)=><tr key={i}>{Array.from({length:isAdmin?7:6}).map((_,j)=><td key={j}><div className="skeleton h-4"/></td>)}</tr>)}
+            {loading&&Array.from({length:4},(_,i)=>i).map(i=><tr key={`sk-${i}`}>{Array.from({length:isAdmin?7:6},(_,j)=>j).map(j=><td key={`sk-col-${j}`}><div className="skeleton h-4"/></td>)}</tr>)}
             {!loading&&filtered.map(r=>(
               <tr key={r.id}>
                 <td className="font-semibold text-neutral-900">{r.name}</td>
@@ -90,14 +90,14 @@ export default function RestaurantsPage() {
           <div className="bg-white rounded-2xl shadow-card-lg w-full max-w-lg">
             <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-200"><h2 className="text-xl font-semibold">{modal.editing?"Редактировать ресторан":"Новый ресторан"}</h2><button onClick={()=>setModal({open:false,editing:null})} className="btn-ghost btn-sm"><X size={16}/></button></div>
             <div className="p-6 space-y-3">
-              <div><label className="label">Название *</label><input value={form.name} onChange={e=>setForm(p=>({...p,name:e.target.value}))} className="input" placeholder="Название ресторана" autoComplete="off"/></div>
-              {isAdmin&&<div><label className="label">Город *</label><CustomSelect value={form.city_id} onChange={v=>setForm(p=>({...p,city_id:v}))} options={cities.map(c=>({value:c.id,label:c.name}))}/></div>}
-              <div><label className="label">Адрес *</label><input value={form.address} onChange={e=>setForm(p=>({...p,address:e.target.value}))} className="input" placeholder="ул. Писарева, д. 1" autoComplete="off"/></div>
-              <div><label className="label">Телефон</label><input value={form.phone} onChange={e=>setForm(p=>({...p,phone:e.target.value}))} className="input" placeholder="+7 (999) 000-00-00" autoComplete="off"/></div>
-              <div><label className="label">Часы работы</label><input value={form.working_hours} onChange={e=>setForm(p=>({...p,working_hours:e.target.value}))} className="input" placeholder="09:00–22:00" autoComplete="off"/></div>
+              <div><label htmlFor="rest-name" className="label">Название *</label><input id="rest-name" value={form.name} onChange={e=>setForm(p=>({...p,name:e.target.value}))} className="input" placeholder="Название ресторана" autoComplete="off"/></div>
+              {isAdmin&&<div><p className="label">Город *</p><CustomSelect value={form.city_id} onChange={v=>setForm(p=>({...p,city_id:v}))} options={cities.map(c=>({value:c.id,label:c.name}))}/></div>}
+              <div><label htmlFor="rest-address" className="label">Адрес *</label><input id="rest-address" value={form.address} onChange={e=>setForm(p=>({...p,address:e.target.value}))} className="input" placeholder="ул. Писарева, д. 1" autoComplete="off"/></div>
+              <div><label htmlFor="rest-phone" className="label">Телефон</label><input id="rest-phone" value={form.phone} onChange={e=>setForm(p=>({...p,phone:e.target.value}))} className="input" placeholder="+7 (999) 000-00-00" autoComplete="off"/></div>
+              <div><label htmlFor="rest-hours" className="label">Часы работы</label><input id="rest-hours" value={form.working_hours} onChange={e=>setForm(p=>({...p,working_hours:e.target.value}))} className="input" placeholder="09:00–22:00" autoComplete="off"/></div>
               <div className="grid grid-cols-2 gap-3">
-                <div><label className="label">Широта</label><input type="number" value={form.lat} onChange={e=>setForm(p=>({...p,lat:e.target.value}))} className="input" placeholder="00.00000" autoComplete="off"/></div>
-                <div><label className="label">Долгота</label><input type="number" value={form.lng} onChange={e=>setForm(p=>({...p,lng:e.target.value}))} className="input" placeholder="00.00000" autoComplete="off"/></div>
+                <div><label htmlFor="rest-lat" className="label">Широта</label><input id="rest-lat" type="number" value={form.lat} onChange={e=>setForm(p=>({...p,lat:e.target.value}))} className="input" placeholder="00.00000" autoComplete="off"/></div>
+                <div><label htmlFor="rest-lng" className="label">Долгота</label><input id="rest-lng" type="number" value={form.lng} onChange={e=>setForm(p=>({...p,lng:e.target.value}))} className="input" placeholder="00.00000" autoComplete="off"/></div>
               </div>
               <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={form.is_active} onChange={e=>setForm(p=>({...p,is_active:e.target.checked}))} className="w-4 h-4 rounded accent-brand-500"/> Открыт</label>
             </div>

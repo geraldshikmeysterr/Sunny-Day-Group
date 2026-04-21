@@ -1,6 +1,5 @@
 "use client";
-import React from "react";
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useAdmin } from "@/components/layout/AdminContext";
 import { Check, X, Edit3, Loader2, ChevronDown, Search } from "lucide-react";
@@ -14,10 +13,10 @@ type Item     = { id: string; name: string; category_id: string; menu_type_id: s
 type Cell     = { is_available: boolean; price: number };
 type Matrix   = Record<string, Record<string, Cell>>; // matrix[item_id][city_id]
 
-function FilterDropdown({ label, options, selected, onToggle, onSelectAll, onClearAll }: {
+function FilterDropdown({ label, options, selected, onToggle, onSelectAll, onClearAll }: Readonly<{
   label: string; options: { id: string; name: string }[]; selected: Set<string>;
   onToggle: (id: string) => void; onSelectAll: () => void; onClearAll: () => void;
-}) {
+}>) {
   const [open, setOpen] = useState(false);
   const count = selected.size;
   return (
@@ -29,7 +28,7 @@ function FilterDropdown({ label, options, selected, onToggle, onSelectAll, onCle
       </button>
       {open && (
         <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <button type="button" aria-label="Закрыть" onClick={() => setOpen(false)} className="fixed inset-0 z-10 cursor-default" />
           <div className="absolute right-0 top-11 z-20 bg-white rounded-xl shadow-card-lg border border-neutral-200 w-44 py-1 animate-scale-in max-h-64 overflow-y-auto">
             <div className="flex gap-2 px-3 py-2 border-b border-neutral-100">
               <button onClick={onSelectAll} className="text-xs text-brand-500 hover:text-brand-600">Все</button>
@@ -147,8 +146,8 @@ export default function AvailabilityPage() {
   }
 
   async function savePrice(itemId: string, cityId: string) {
-    const rubles = parseFloat(priceInput.replace(",", "."));
-    const price  = !priceInput.trim() || isNaN(rubles) || rubles < 0 ? 0 : rubles;
+    const rubles = Number.parseFloat(priceInput.replace(",", "."));
+    const price  = !priceInput.trim() || Number.isNaN(rubles) || rubles < 0 ? 0 : rubles;
     const cur    = matrix[itemId]?.[cityId];
     setSaving(`price_${itemId}_${cityId}`);
     try {

@@ -166,7 +166,7 @@ export default function SettingsPage() {
                   <div className="flex items-center gap-2">
                     <input
                       value={unenrollCode}
-                      onChange={e => setUnenrollCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                      onChange={e => setUnenrollCode(e.target.value.replaceAll(/\D/g, "").slice(0, 6))}
                       className="input text-center font-mono w-28 text-sm"
                       placeholder="000000"
                       maxLength={6}
@@ -199,7 +199,7 @@ export default function SettingsPage() {
               </div>
             ))}
           </div>
-        ) : !enrolling ? (
+        ) : enrolling ? null : (
           <div className="flex items-start gap-3 p-4 bg-neutral-50 rounded-xl">
             <Shield size={20} className="text-neutral-400 mt-0.5 shrink-0" />
             <div className="flex-1">
@@ -212,7 +212,7 @@ export default function SettingsPage() {
               Подключить
             </button>
           </div>
-        ) : null}
+        )}
 
         {enrolling && qrCode && (
           <div className="space-y-5 p-4 bg-neutral-50 rounded-xl border border-neutral-200">
@@ -239,7 +239,7 @@ export default function SettingsPage() {
               <div className="flex gap-2">
                 <input
                   value={code}
-                  onChange={e => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  onChange={e => setCode(e.target.value.replaceAll(/\D/g, "").slice(0, 6))}
                   className="input text-center text-xl font-mono tracking-[0.4em] pl-[0.4em] w-40"
                   placeholder="000000"
                   maxLength={6}

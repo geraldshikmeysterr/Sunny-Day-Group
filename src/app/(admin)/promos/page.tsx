@@ -54,11 +54,11 @@ export default function PromosPage() {
     const code = form.code.toUpperCase().trim();
     if (!code) return;
     if (!/^[A-Z0-9_-]{1,50}$/.test(code)) { toast.error("Код: только буквы, цифры, _ и -, максимум 50 символов"); return; }
-    const discountValue = parseFloat(form.discount_value);
-    if (isNaN(discountValue) || discountValue <= 0) { toast.error("Укажите размер скидки больше 0"); return; }
+    const discountValue = Number.parseFloat(form.discount_value);
+    if (Number.isNaN(discountValue) || discountValue <= 0) { toast.error("Укажите размер скидки больше 0"); return; }
     if (form.promo_type === "percent" && discountValue > 100) { toast.error("Скидка в % не может превышать 100"); return; }
     setSaving(true);
-    const payload = {code,description:form.description||null,promo_type:form.promo_type,discount_value:discountValue,promo_scope:form.promo_scope,min_order_amount:form.min_order_amount?parseFloat(form.min_order_amount):null,max_uses:form.max_uses?parseInt(form.max_uses):null,valid_from:form.valid_from||null,valid_until:form.valid_until||null,city_id:form.city_id||null,is_active:form.is_active};
+    const payload = {code,description:form.description||null,promo_type:form.promo_type,discount_value:discountValue,promo_scope:form.promo_scope,min_order_amount:form.min_order_amount?Number.parseFloat(form.min_order_amount):null,max_uses:form.max_uses?Number.parseInt(form.max_uses):null,valid_from:form.valid_from||null,valid_until:form.valid_until||null,city_id:form.city_id||null,is_active:form.is_active};
     if (editing) await supabase.from("promocodes").update(payload).eq("id",editing.id);
     else await supabase.from("promocodes").insert(payload);
     toast.success(editing?"Промокод обновлён":"Промокод создан");
@@ -90,7 +90,7 @@ export default function PromosPage() {
         <table className="table">
           <thead><tr><th>Код</th><th>Тип</th><th>Размер</th><th>Область</th><th>Использований</th><th>Срок</th><th>Статус</th><th></th></tr></thead>
           <tbody>
-            {loading&&Array.from({length:4}).map((_,i)=><tr key={i}>{Array.from({length:8}).map((_,j)=><td key={j}><div className="skeleton h-4"/></td>)}</tr>)}
+            {loading&&Array.from({length:4},(_,i)=>i).map(i=><tr key={`sk-${i}`}>{Array.from({length:8},(_,j)=>j).map(j=><td key={`sk-col-${j}`}><div className="skeleton h-4"/></td>)}</tr>)}
             {!loading&&filtered.map(p=>(
               <tr key={p.id} className="cursor-pointer" onClick={()=>openEdit(p)}>
                 <td><p className="font-mono font-bold">{p.code}</p>{p.description&&<p className="text-xs text-neutral-400 truncate max-w-[160px]">{p.description}</p>}</td>
@@ -117,17 +117,17 @@ export default function PromosPage() {
             </div>
             <div className="overflow-y-auto flex-1 p-6 space-y-4">
               <div className="grid grid-cols-2 gap-3">
-                <div><label className="label">Код *</label><input value={form.code} onChange={e=>setForm((p:any)=>({...p,code:e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g,"")}))} className="input font-mono" placeholder="SUNNY20" maxLength={50} autoComplete="off"/></div>
-                <div><label className="label">Город</label><CustomSelect value={form.city_id} onChange={v=>setForm((p:any)=>({...p,city_id:v}))} options={cityOptions}/></div>
+                <div><label htmlFor="promo-code" className="label">Код *</label><input id="promo-code" value={form.code} onChange={e=>setForm((p:any)=>({...p,code:e.target.value.toUpperCase().replaceAll(/[^A-Z0-9_-]/g,"")}))} className="input font-mono" placeholder="SUNNY20" maxLength={50} autoComplete="off"/></div>
+                <div><p className="label">Город</p><CustomSelect value={form.city_id} onChange={v=>setForm((p:any)=>({...p,city_id:v}))} options={cityOptions}/></div>
               </div>
-              <div><label className="label">Описание</label><textarea value={form.description} onChange={e=>setForm((p:any)=>({...p,description:e.target.value}))} rows={3} className="textarea w-full" placeholder="Описание промокода"/></div>
+              <div><label htmlFor="promo-desc" className="label">Описание</label><textarea id="promo-desc" value={form.description} onChange={e=>setForm((p:any)=>({...p,description:e.target.value}))} rows={3} className="textarea w-full" placeholder="Описание промокода"/></div>
               <div className="grid grid-cols-2 gap-3">
-                <div><label className="label">Тип скидки *</label><CustomSelect value={form.promo_type} onChange={v=>setForm((p:any)=>({...p,promo_type:v}))} options={typeOptions}/></div>
-                <div><label className="label">{form.promo_type==="percent"?"Размер (%)":"Сумма (₽)"} *</label><input type="number" value={form.discount_value} onChange={e=>setForm((p:any)=>({...p,discount_value:e.target.value}))} className="input" placeholder="0" autoComplete="off"/></div>
+                <div><p className="label">Тип скидки *</p><CustomSelect value={form.promo_type} onChange={v=>setForm((p:any)=>({...p,promo_type:v}))} options={typeOptions}/></div>
+                <div><label htmlFor="promo-discount" className="label">{form.promo_type==="percent"?"Размер (%)":"Сумма (₽)"} *</label><input id="promo-discount" type="number" value={form.discount_value} onChange={e=>setForm((p:any)=>({...p,discount_value:e.target.value}))} className="input" placeholder="0" autoComplete="off"/></div>
               </div>
-              <div><label className="label">Область применения</label><CustomSelect value={form.promo_scope} onChange={v=>setForm((p:any)=>({...p,promo_scope:v}))} options={scopeOptions}/></div>
+              <div><p className="label">Область применения</p><CustomSelect value={form.promo_scope} onChange={v=>setForm((p:any)=>({...p,promo_scope:v}))} options={scopeOptions}/></div>
               {form.promo_scope==="item"&&(
-                <div><label className="label">Блюда</label>
+                <div><p className="label">Блюда</p>
                   <div className="border border-neutral-200 rounded-lg p-2 max-h-40 overflow-y-auto space-y-0.5">
                     {menuItems.map((item:any)=>(
                       <button key={item.id} type="button"
@@ -143,7 +143,7 @@ export default function PromosPage() {
                 </div>
               )}
               {form.promo_scope==="category"&&(
-                <div><label className="label">Категории</label>
+                <div><p className="label">Категории</p>
                   <div className="border border-neutral-200 rounded-lg p-2 max-h-40 overflow-y-auto space-y-0.5">
                     {categories.map((cat:any)=>(
                       <button key={cat.id} type="button"
@@ -159,10 +159,10 @@ export default function PromosPage() {
                 </div>
               )}
               <div className="grid grid-cols-2 gap-3">
-                <div><label className="label">Мин. сумма (₽)</label><input type="number" value={form.min_order_amount} onChange={e=>setForm((p:any)=>({...p,min_order_amount:e.target.value}))} className="input" placeholder="0" autoComplete="off"/></div>
-                <div><label className="label">Макс. использований</label><input type="number" value={form.max_uses} onChange={e=>setForm((p:any)=>({...p,max_uses:e.target.value}))} className="input" placeholder="∞" autoComplete="off"/></div>
-                <div><label className="label">Действует с</label><input type="datetime-local" value={form.valid_from} onChange={e=>setForm((p:any)=>({...p,valid_from:e.target.value}))} className="input"/></div>
-                <div><label className="label">Действует до</label><input type="datetime-local" value={form.valid_until} onChange={e=>setForm((p:any)=>({...p,valid_until:e.target.value}))} className="input"/></div>
+                <div><label htmlFor="promo-min" className="label">Мин. сумма (₽)</label><input id="promo-min" type="number" value={form.min_order_amount} onChange={e=>setForm((p:any)=>({...p,min_order_amount:e.target.value}))} className="input" placeholder="0" autoComplete="off"/></div>
+                <div><label htmlFor="promo-max-uses" className="label">Макс. использований</label><input id="promo-max-uses" type="number" value={form.max_uses} onChange={e=>setForm((p:any)=>({...p,max_uses:e.target.value}))} className="input" placeholder="∞" autoComplete="off"/></div>
+                <div><label htmlFor="promo-from" className="label">Действует с</label><input id="promo-from" type="datetime-local" value={form.valid_from} onChange={e=>setForm((p:any)=>({...p,valid_from:e.target.value}))} className="input"/></div>
+                <div><label htmlFor="promo-until" className="label">Действует до</label><input id="promo-until" type="datetime-local" value={form.valid_until} onChange={e=>setForm((p:any)=>({...p,valid_until:e.target.value}))} className="input"/></div>
               </div>
               <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={form.is_active} onChange={e=>setForm((p:any)=>({...p,is_active:e.target.checked}))} className="w-4 h-4 rounded accent-brand-500"/> Активен</label>
             </div>

@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 type AdminCtx = { isAdmin: boolean; cityId: string | null; loaded: boolean };
 const Ctx = createContext<AdminCtx>({ isAdmin: false, cityId: null, loaded: false });
 
-export function AdminProvider({ children }: { children: React.ReactNode }) {
+export function AdminProvider({ children }: Readonly<{ children: React.ReactNode }>) {
   const [ctx, setCtx] = useState<AdminCtx>({ isAdmin: false, cityId: null, loaded: false });
 
   useEffect(() => {

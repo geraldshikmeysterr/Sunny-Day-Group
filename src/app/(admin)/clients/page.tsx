@@ -55,8 +55,8 @@ export default function GuestsPage() {
             <tr><th>Гость</th><th>Телефон</th><th>Город</th><th>Дата регистрации</th></tr>
           </thead>
           <tbody>
-            {loading && Array.from({ length: 8 }).map((_, i) => (
-              <tr key={i}>{Array.from({ length: 4 }).map((_, j) => <td key={j}><div className="skeleton h-4" /></td>)}</tr>
+            {loading && Array.from({ length: 8 }, (_, i) => i).map(i => (
+              <tr key={`sk-${i}`}>{Array.from({ length: 4 }, (_, j) => j).map(j => <td key={`sk-col-${j}`}><div className="skeleton h-4" /></td>)}</tr>
             ))}
             {!loading && clients.map(c => (
               <tr key={c.id}>
@@ -67,7 +67,7 @@ export default function GuestsPage() {
                   <p className="text-xs text-neutral-400 font-mono">{c.id.slice(0, 8)}</p>
                 </td>
                 <td className="font-mono text-sm text-neutral-600">{c.phone || "—"}</td>
-                <td className="text-sm text-neutral-500">{(c.cities as any)?.name ?? "—"}</td>
+                <td className="text-sm text-neutral-500">{c.cities?.name ?? "—"}</td>
                 <td className="text-sm text-neutral-400 num">{formatDate(c.created_at)}</td>
               </tr>
             ))}

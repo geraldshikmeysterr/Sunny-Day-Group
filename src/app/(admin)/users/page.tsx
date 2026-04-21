@@ -72,8 +72,8 @@ export default function UsersPage() {
             </tr>
           </thead>
           <tbody>
-            {loading && Array.from({ length: 4 }).map((_, i) => (
-              <tr key={i}>{Array.from({ length: 5 }).map((_, j) => <td key={j}><div className="skeleton h-4" /></td>)}</tr>
+            {loading && Array.from({ length: 4 }, (_, i) => i).map(i => (
+              <tr key={`sk-${i}`}>{Array.from({ length: 5 }, (_, j) => j).map(j => <td key={`sk-col-${j}`}><div className="skeleton h-4" /></td>)}</tr>
             ))}
             {!loading && filtered.map(u => (
               <tr key={u.id}>
