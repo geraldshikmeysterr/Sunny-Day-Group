@@ -138,6 +138,7 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
     if (error) toast.error("Не удалось загрузить зоны");
     setZones((data as FullZone[]) ?? []);
     setLoading(false);
+    setMapKey((k) => k + 1);
   }, [cityId]);
 
   useEffect(() => { fetchZones(); }, [fetchZones]);
@@ -221,7 +222,6 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
       setForm(null);
       setMapMode("view");
       fetchZones();
-      setMapKey((k) => k + 1);
     }
   }
 
