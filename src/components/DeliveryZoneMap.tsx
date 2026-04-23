@@ -74,6 +74,9 @@ export default function DeliveryZoneMap({ zones, mode, onPolygonComplete, onDraw
   const drawRef = useRef<{ points: [number, number][]; polyline: any; markers: any[] }>(
     { points: [], polyline: null, markers: [] }
   );
+  // Always-current ref so the single registered click handler sees latest mode
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
   const [pointCount, setPointCount] = useState(0);
 
   const getCenter = useCallback((): [number, number] => {
@@ -142,40 +145,40 @@ export default function DeliveryZoneMap({ zones, mode, onPolygonComplete, onDraw
         map.geoObjects.add(polygon);
       });
 
-      if (mode === "draw") {
-        map.events.add("click", (e: any) => {
-          const coords: [number, number] = e.get("coords");
-          const d = drawRef.current;
-          d.points.push(coords);
-          setPointCount(d.points.length);
+      // Click handler always registered — modeRef guards drawing logic so
+      // it works even when mode prop changes after map initialisation.
+      map.events.add("click", (e: any) => {
+        if (modeRef.current !== "draw") return;
+        const coords: [number, number] = e.get("coords");
+        const d = drawRef.current;
+        d.points.push(coords);
+        setPointCount(d.points.length);
 
-          const dot = new ymaps.Placemark(
-            coords, {},
+        const dot = new ymaps.Placemark(
+          coords, {},
+          {
+            preset: "islands#circleDotIcon",
+            iconColor: "#F57300",
+            interactivityModel: "default#transparent",
+          }
+        );
+        map.geoObjects.add(dot);
+        d.markers.push(dot);
+
+        if (d.polyline) map.geoObjects.remove(d.polyline);
+        if (d.points.length >= 2) {
+          d.polyline = new ymaps.Polyline(
+            [...d.points, d.points[0]], {},
             {
-              preset: "islands#circleDotIcon",
-              iconColor: "#F57300",
-              // critical: don't let markers intercept subsequent map clicks
+              strokeColor: "#F57300",
+              strokeWidth: 2,
+              strokeStyle: "dash",
               interactivityModel: "default#transparent",
             }
           );
-          map.geoObjects.add(dot);
-          d.markers.push(dot);
-
-          if (d.polyline) map.geoObjects.remove(d.polyline);
-          if (d.points.length >= 2) {
-            d.polyline = new ymaps.Polyline(
-              [...d.points, d.points[0]], {},
-              {
-                strokeColor: "#F57300",
-                strokeWidth: 2,
-                strokeStyle: "dash",
-                interactivityModel: "default#transparent",
-              }
-            );
-            map.geoObjects.add(d.polyline);
-          }
-        });
-      }
+          map.geoObjects.add(d.polyline);
+        }
+      });
     });
 
     return () => {
