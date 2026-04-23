@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState, useCallback } from "react";
-import { MapPin, X, Check } from "lucide-react";
+import { MapPin, X, Check, Undo2 } from "lucide-react";
 
 export type ZoneGeoJSON = {
   type: "Polygon";
@@ -17,6 +17,8 @@ export type DeliveryZone = {
 
 type Props = {
   zones: DeliveryZone[];
+  // Drawn-but-unsaved polygon shown as a dashed preview on the map.
+  previewGeojson?: ZoneGeoJSON | null;
   mode: "view" | "draw";
   onPolygonComplete?: (geojson: ZoneGeoJSON) => void;
   onDrawCancel?: () => void;
@@ -26,17 +28,14 @@ type Props = {
 const DEFAULT_CENTER: [number, number] = [55.751244, 37.618423];
 const DEFAULT_ZOOM = 11;
 
-// GeoJSON: [lng, lat] → Yandex Maps: [lat, lng]
 function toYmaps(coords: [number, number][]): [number, number][] {
   return coords.map(([lng, lat]) => [lat, lng]);
 }
-// Yandex Maps: [lat, lng] → GeoJSON: [lng, lat]
 function toGeojson(coords: [number, number][]): [number, number][] {
   return coords.map(([lat, lng]) => [lng, lat]);
 }
 
 declare global {
-  // var declarations extend globalThis (required for globalThis.x access)
   var ymaps: any;
   var _ymapsReady: boolean;
   var _ymapsCallbacks: Array<() => void>;
@@ -67,14 +66,21 @@ function loadYandexMaps(apiKey: string): Promise<void> {
   });
 }
 
-export default function DeliveryZoneMap({ zones, mode, onPolygonComplete, onDrawCancel, center }: Props) {
+function buildPolyline(ymaps: any, points: [number, number][]) {
+  return new ymaps.Polyline(
+    [...points, points[0]], {},
+    { strokeColor: "#F57300", strokeWidth: 2, strokeStyle: "dash", interactivityModel: "default#transparent" }
+  );
+}
+
+export default function DeliveryZoneMap({ zones, previewGeojson, mode, onPolygonComplete, onDrawCancel, center }: Readonly<Props>) {
   const apiKey = process.env.NEXT_PUBLIC_YANDEX_MAPS_KEY ?? "";
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const drawRef = useRef<{ points: [number, number][]; polyline: any; markers: any[] }>(
     { points: [], polyline: null, markers: [] }
   );
-  // Always-current ref so the single registered click handler sees latest mode
+  const previewRef = useRef<any>(null);
   const modeRef = useRef(mode);
   modeRef.current = mode;
   const [pointCount, setPointCount] = useState(0);
@@ -83,10 +89,7 @@ export default function DeliveryZoneMap({ zones, mode, onPolygonComplete, onDraw
     if (center) return center;
     if (zones.length > 0) {
       const c = zones[0].geojson.coordinates[0];
-      return [
-        c.reduce((s, p) => s + p[1], 0) / c.length,
-        c.reduce((s, p) => s + p[0], 0) / c.length,
-      ];
+      return [c.reduce((s, p) => s + p[1], 0) / c.length, c.reduce((s, p) => s + p[0], 0) / c.length];
     }
     return DEFAULT_CENTER;
   }, [center, zones]);
@@ -104,17 +107,34 @@ export default function DeliveryZoneMap({ zones, mode, onPolygonComplete, onDraw
   const completePolygon = useCallback(() => {
     const d = drawRef.current;
     if (d.points.length < 3) return;
-    const closed = [...d.points, d.points[0]];
-    const geojson: ZoneGeoJSON = { type: "Polygon", coordinates: [toGeojson(closed)] };
+    const geojson: ZoneGeoJSON = { type: "Polygon", coordinates: [toGeojson([...d.points, d.points[0]])] };
     clearDrawing();
     onPolygonComplete?.(geojson);
   }, [clearDrawing, onPolygonComplete]);
+
+  const deleteLastPoint = useCallback(() => {
+    const map = mapRef.current;
+    const d = drawRef.current;
+    if (!map || d.points.length === 0) return;
+
+    const lastMarker = d.markers.pop();
+    if (lastMarker) map.geoObjects.remove(lastMarker);
+    d.points.pop();
+    setPointCount(d.points.length);
+
+    if (d.polyline) { map.geoObjects.remove(d.polyline); d.polyline = null; }
+    if (d.points.length >= 2) {
+      d.polyline = buildPolyline(globalThis.ymaps, d.points);
+      map.geoObjects.add(d.polyline);
+    }
+  }, []);
 
   const handleCancel = useCallback(() => {
     clearDrawing();
     onDrawCancel?.();
   }, [clearDrawing, onDrawCancel]);
 
+  // Map initialisation (runs once per mount)
   useEffect(() => {
     if (!apiKey || !containerRef.current) return;
     let destroyed = false;
@@ -122,7 +142,7 @@ export default function DeliveryZoneMap({ zones, mode, onPolygonComplete, onDraw
     loadYandexMaps(apiKey).then(() => {
       if (destroyed || !containerRef.current) return;
 
-      const ymaps = window.ymaps;
+      const ymaps = globalThis.ymaps;
       const map = new ymaps.Map(
         containerRef.current,
         { center: getCenter(), zoom: DEFAULT_ZOOM, controls: ["zoomControl", "fullscreenControl"] },
@@ -131,22 +151,14 @@ export default function DeliveryZoneMap({ zones, mode, onPolygonComplete, onDraw
       mapRef.current = map;
 
       zones.forEach((zone) => {
-        const polygon = new ymaps.Polygon(
+        map.geoObjects.add(new ymaps.Polygon(
           [toYmaps(zone.geojson.coordinates[0])],
           { hintContent: zone.name },
-          {
-            fillColor: zone.is_active ? "#F5730030" : "#94a3b830",
-            strokeColor: zone.is_active ? "#F57300" : "#94a3b8",
-            strokeWidth: 2,
-            // transparent to events so clicks on polygon still register on map
-            interactivityModel: "default#transparent",
-          }
-        );
-        map.geoObjects.add(polygon);
+          { fillColor: zone.is_active ? "#F5730030" : "#94a3b830", strokeColor: zone.is_active ? "#F57300" : "#94a3b8", strokeWidth: 2, interactivityModel: "default#transparent" }
+        ));
       });
 
-      // Click handler always registered — modeRef guards drawing logic so
-      // it works even when mode prop changes after map initialisation.
+      // Always registered; modeRef makes it active only in draw mode.
       map.events.add("click", (e: any) => {
         if (modeRef.current !== "draw") return;
         const coords: [number, number] = e.get("coords");
@@ -154,28 +166,13 @@ export default function DeliveryZoneMap({ zones, mode, onPolygonComplete, onDraw
         d.points.push(coords);
         setPointCount(d.points.length);
 
-        const dot = new ymaps.Placemark(
-          coords, {},
-          {
-            preset: "islands#circleDotIcon",
-            iconColor: "#F57300",
-            interactivityModel: "default#transparent",
-          }
-        );
+        const dot = new ymaps.Placemark(coords, {}, { preset: "islands#circleDotIcon", iconColor: "#F57300", interactivityModel: "default#transparent" });
         map.geoObjects.add(dot);
         d.markers.push(dot);
 
         if (d.polyline) map.geoObjects.remove(d.polyline);
         if (d.points.length >= 2) {
-          d.polyline = new ymaps.Polyline(
-            [...d.points, d.points[0]], {},
-            {
-              strokeColor: "#F57300",
-              strokeWidth: 2,
-              strokeStyle: "dash",
-              interactivityModel: "default#transparent",
-            }
-          );
+          d.polyline = buildPolyline(ymaps, d.points);
           map.geoObjects.add(d.polyline);
         }
       });
@@ -188,6 +185,24 @@ export default function DeliveryZoneMap({ zones, mode, onPolygonComplete, onDraw
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiKey]);
 
+  // Show / update the preview polygon when previewGeojson changes.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !globalThis.ymaps) return;
+
+    if (previewRef.current) { map.geoObjects.remove(previewRef.current); previewRef.current = null; }
+
+    if (previewGeojson) {
+      previewRef.current = new globalThis.ymaps.Polygon(
+        [toYmaps(previewGeojson.coordinates[0])],
+        { hintContent: "Новая зона" },
+        { fillColor: "#F5730040", strokeColor: "#F57300", strokeWidth: 2, strokeStyle: "dash", interactivityModel: "default#transparent" }
+      );
+      map.geoObjects.add(previewRef.current);
+    }
+  }, [previewGeojson]);
+
+  // Keyboard cancel
   useEffect(() => {
     if (mode !== "draw") return;
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") handleCancel(); };
@@ -210,27 +225,29 @@ export default function DeliveryZoneMap({ zones, mode, onPolygonComplete, onDraw
 
   return (
     <div className="relative w-full h-full min-h-64 rounded-xl overflow-hidden">
-      {/* map container — explicit style height so Yandex Maps gets real dimensions */}
       <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
 
       {mode === "draw" && (
-        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 bg-white/95 backdrop-blur-sm rounded-full shadow-md px-3 py-1.5 text-sm">
-          {pointCount < 3 ? (
-            <span className="text-neutral-500">
-              Кликайте по карте — нужно минимум 3 точки{pointCount > 0 ? ` (${pointCount})` : ""}
-            </span>
-          ) : (
-            <>
-              <span className="text-neutral-500">{pointCount} точек</span>
-              <button
-                onClick={completePolygon}
-                className="flex items-center gap-1 bg-brand-500 hover:bg-brand-600 text-white rounded-full px-3 py-1 text-xs font-medium transition-colors"
-              >
-                <Check size={12} /> Завершить
-              </button>
-            </>
+        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 bg-white/95 backdrop-blur-sm rounded-full shadow-md px-3 py-1.5 text-xs whitespace-nowrap">
+          <span className="text-neutral-500">
+            {pointCount < 3 ? `Кликайте по карте (${pointCount}/3)` : `${pointCount} точек`}
+          </span>
+
+          {pointCount > 0 && (
+            <button onClick={deleteLastPoint} title="Удалить последнюю точку"
+              className="flex items-center gap-1 text-neutral-500 hover:text-neutral-700 transition-colors">
+              <Undo2 size={12} /> Отмена
+            </button>
           )}
-          <button onClick={handleCancel} className="text-neutral-400 hover:text-neutral-600 ml-1">
+
+          {pointCount >= 3 && (
+            <button onClick={completePolygon}
+              className="flex items-center gap-1 bg-brand-500 hover:bg-brand-600 text-white rounded-full px-3 py-1 font-medium transition-colors">
+              <Check size={12} /> Завершить
+            </button>
+          )}
+
+          <button onClick={handleCancel} className="text-neutral-400 hover:text-neutral-600">
             <X size={14} />
           </button>
         </div>

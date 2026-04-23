@@ -10,7 +10,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import {
   Plus, GripVertical, Edit2, Trash2, Eye, EyeOff,
-  Loader2, CheckCircle2, PenLine,
+  Loader2, CheckCircle2, PenLine, FileJson,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
@@ -32,14 +32,22 @@ type ZoneForm = {
   geojson: ZoneGeoJSON | null;
 };
 
+type ZoneBase = {
+  name: string;
+  delivery_fee: number;
+  min_order: number;
+  free_from: number | null;
+  geojson: ZoneGeoJSON;
+  is_active: boolean;
+  sort_order: number;
+};
+
 const EMPTY_FORM: ZoneForm = {
   id: null, name: "", delivery_fee: "0", free_from: "", min_order: "0", geojson: null,
 };
 
 type Props = {
-  // Provided when editing an existing city — zones saved to DB immediately.
   cityId?: string;
-  // Provided when creating a new city — zones held in memory, parent persists them.
   pendingZones?: FullZone[];
   onPendingChange?: (zones: FullZone[]) => void;
 };
@@ -108,6 +116,8 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [mapKey, setMapKey] = useState(0);
   const [formError, setFormError] = useState("");
+  const [showImport, setShowImport] = useState(false);
+  const [importText, setImportText] = useState("");
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -134,7 +144,6 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
 
   useEffect(() => { fetchZones(); }, [fetchZones]);
 
-  // Notify parent of pending zones changes
   const syncPending = useCallback((updated: FullZone[]) => {
     if (isPending) onPendingChange?.(updated);
   }, [isPending, onPendingChange]);
@@ -143,10 +152,16 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
   // Form helpers
   // ------------------------------------------------------------------
 
+  function resetFormState() {
+    setFormError("");
+    setShowImport(false);
+    setImportText("");
+  }
+
   function openAdd() {
     setForm({ ...EMPTY_FORM });
     setMapMode("draw");
-    setFormError("");
+    resetFormState();
   }
 
   function openEdit(zone: FullZone) {
@@ -154,18 +169,18 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
       id: zone.id,
       name: zone.name,
       delivery_fee: String(zone.delivery_fee),
-      free_from: zone.free_from != null ? String(zone.free_from) : "",
+      free_from: zone.free_from === null ? "" : String(zone.free_from),
       min_order: String(zone.min_order),
       geojson: zone.geojson,
     });
     setMapMode("view");
-    setFormError("");
+    resetFormState();
   }
 
   function cancelForm() {
     setForm(null);
     setMapMode("view");
-    setFormError("");
+    resetFormState();
   }
 
   function handlePolygonComplete(geojson: ZoneGeoJSON) {
@@ -173,27 +188,84 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
     setMapMode("view");
   }
 
+  function importGeoJSON() {
+    try {
+      const parsed = JSON.parse(importText.trim());
+      let geojson: ZoneGeoJSON | null = null;
+
+      if (parsed.type === "Polygon") {
+        geojson = parsed as ZoneGeoJSON;
+      } else if (parsed.type === "Feature" && parsed.geometry?.type === "Polygon") {
+        geojson = parsed.geometry as ZoneGeoJSON;
+      } else if (parsed.type === "FeatureCollection" && Array.isArray(parsed.features)) {
+        const poly = parsed.features.find((f: any) => f.geometry?.type === "Polygon");
+        if (poly) geojson = poly.geometry as ZoneGeoJSON;
+      }
+
+      if (geojson === null) {
+        toast.error("Не найден полигон в GeoJSON");
+        return;
+      }
+
+      setForm((prev) => prev ? { ...prev, geojson } : prev);
+      setShowImport(false);
+      setImportText("");
+      setMapKey((k) => k + 1);
+      toast.success("Зона импортирована");
+    } catch {
+      toast.error("Некорректный JSON");
+    }
+  }
+
   function validate(f: ZoneForm): string {
     if (!f.name.trim()) return "Введите название зоны";
-    if (!f.geojson) return "Нарисуйте зону на карте";
-    if (isNaN(Number(f.delivery_fee)) || Number(f.delivery_fee) < 0) return "Некорректная стоимость доставки";
-    if (isNaN(Number(f.min_order)) || Number(f.min_order) < 0) return "Некорректный минимальный заказ";
+    if (!f.geojson) return "Нарисуйте или импортируйте зону";
+    if (Number.isNaN(Number(f.delivery_fee)) || Number(f.delivery_fee) < 0) return "Некорректная стоимость доставки";
+    if (Number.isNaN(Number(f.min_order)) || Number(f.min_order) < 0) return "Некорректный минимальный заказ";
     const free = f.free_from.trim() ? Number(f.free_from) : null;
-    if (free !== null && (isNaN(free) || free < 0)) return "Некорректная сумма для бесплатной доставки";
+    if (free !== null && (Number.isNaN(free) || free < 0)) return "Некорректная сумма для бесплатной доставки";
     return "";
   }
 
   // ------------------------------------------------------------------
-  // CRUD
+  // CRUD helpers extracted to keep saveZone complexity low
   // ------------------------------------------------------------------
+
+  function applyPendingZone(base: ZoneBase, formId: string | null) {
+    const updated = formId
+      ? zones.map((z) => z.id === formId ? { ...z, ...base } : z)
+      : [...zones, { ...base, id: crypto.randomUUID() }];
+    setZones(updated);
+    syncPending(updated);
+    setForm(null);
+    setMapMode("view");
+    setMapKey((k) => k + 1);
+  }
+
+  async function applyDbZone(base: ZoneBase, formId: string | null) {
+    const payload = { ...base, city_id: cityId };
+    const { error } = formId
+      ? await supabase.from("delivery_zones").update(payload).eq("id", formId)
+      : await supabase.from("delivery_zones").insert(payload);
+    if (error) {
+      setFormError(error.message);
+    } else {
+      toast.success(formId ? "Зона обновлена" : "Зона добавлена");
+      setForm(null);
+      setMapMode("view");
+      await fetchZones();
+      setMapKey((k) => k + 1);
+    }
+  }
 
   async function saveZone() {
     if (!form) return;
     const err = validate(form);
     if (err) { setFormError(err); return; }
-    setSaving(true); setFormError("");
+    setSaving(true);
+    setFormError("");
 
-    const base = {
+    const base: ZoneBase = {
       name: form.name.trim(),
       delivery_fee: Number(form.delivery_fee),
       min_order: Number(form.min_order),
@@ -204,28 +276,9 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
     };
 
     if (isPending) {
-      // No DB — manage in local state only
-      const updated = form.id
-        ? zones.map((z) => z.id === form.id ? { ...z, ...base } : z)
-        : [...zones, { ...base, id: crypto.randomUUID() }];
-      setZones(updated);
-      syncPending(updated);
-      setForm(null);
-      setMapMode("view");
-      setMapKey((k) => k + 1);
+      applyPendingZone(base, form.id);
     } else {
-      const payload = { ...base, city_id: cityId };
-      const { error } = form.id
-        ? await supabase.from("delivery_zones").update(payload).eq("id", form.id)
-        : await supabase.from("delivery_zones").insert(payload);
-      if (error) { setFormError(error.message); }
-      else {
-        toast.success(form.id ? "Зона обновлена" : "Зона добавлена");
-        setForm(null);
-        setMapMode("view");
-        await fetchZones();
-        setMapKey((k) => k + 1);
-      }
+      await applyDbZone(base, form.id);
     }
     setSaving(false);
   }
@@ -234,9 +287,11 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
     const updated = zones.map((z) => z.id === zone.id ? { ...z, is_active: !zone.is_active } : z);
     setZones(updated);
     setMapKey((k) => k + 1);
-    if (!isPending) {
+    if (isPending) {
+      syncPending(updated);
+    } else {
       await supabase.from("delivery_zones").update({ is_active: !zone.is_active }).eq("id", zone.id);
-    } else { syncPending(updated); }
+    }
   }
 
   async function deleteZone(zone: FullZone) {
@@ -275,6 +330,35 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
   }));
 
   // ------------------------------------------------------------------
+  // Render helpers
+  // ------------------------------------------------------------------
+
+  function renderZoneList() {
+    if (loading) {
+      return Array.from({ length: 2 }, (_, i) => <div key={i} className="skeleton h-14 rounded-lg" />);
+    }
+    if (zones.length === 0) {
+      return <p className="text-xs text-neutral-400 text-center py-6">Зон пока нет</p>;
+    }
+    return (
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={zones.map((z) => z.id)} strategy={verticalListSortingStrategy}>
+          {zones.map((zone) => (
+            <ZoneRow
+              key={zone.id}
+              zone={zone}
+              onEdit={openEdit}
+              onToggle={toggleZone}
+              onDelete={deleteZone}
+              deleting={deletingId === zone.id}
+            />
+          ))}
+        </SortableContext>
+      </DndContext>
+    );
+  }
+
+  // ------------------------------------------------------------------
   // Render
   // ------------------------------------------------------------------
 
@@ -290,26 +374,7 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-3 space-y-2">
-              {loading ? (
-                Array.from({ length: 2 }, (_, i) => <div key={i} className="skeleton h-14 rounded-lg" />)
-              ) : zones.length === 0 ? (
-                <p className="text-xs text-neutral-400 text-center py-6">Зон пока нет</p>
-              ) : (
-                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                  <SortableContext items={zones.map((z) => z.id)} strategy={verticalListSortingStrategy}>
-                    {zones.map((zone) => (
-                      <ZoneRow
-                        key={zone.id}
-                        zone={zone}
-                        onEdit={openEdit}
-                        onToggle={toggleZone}
-                        onDelete={deleteZone}
-                        deleting={deletingId === zone.id}
-                      />
-                    ))}
-                  </SortableContext>
-                </DndContext>
-              )}
+              {renderZoneList()}
             </div>
           </>
         ) : (
@@ -318,8 +383,9 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
               {form.id ? "Редактировать зону" : "Новая зона"}
             </p>
             <div>
-              <label className="label">Название *</label>
+              <label htmlFor="zone-name" className="label">Название *</label>
               <input
+                id="zone-name"
                 value={form.name}
                 onChange={(e) => setForm((p) => p && { ...p, name: e.target.value })}
                 className="input"
@@ -329,31 +395,34 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="label">Доставка, ₽</label>
-                <input type="number" min="0" value={form.delivery_fee}
+                <label htmlFor="zone-fee" className="label">Доставка, ₽</label>
+                <input id="zone-fee" type="number" min="0" value={form.delivery_fee}
                   onChange={(e) => setForm((p) => p && { ...p, delivery_fee: e.target.value })}
                   className="input" placeholder="0" />
               </div>
               <div>
-                <label className="label">Мин. заказ, ₽</label>
-                <input type="number" min="0" value={form.min_order}
+                <label htmlFor="zone-min-order" className="label">Мин. заказ, ₽</label>
+                <input id="zone-min-order" type="number" min="0" value={form.min_order}
                   onChange={(e) => setForm((p) => p && { ...p, min_order: e.target.value })}
                   className="input" placeholder="0" />
               </div>
               <div className="col-span-2">
-                <label className="label">Бесплатно от, ₽</label>
-                <input type="number" min="0" value={form.free_from}
+                <label htmlFor="zone-free-from" className="label">Бесплатно от, ₽</label>
+                <input id="zone-free-from" type="number" min="0" value={form.free_from}
                   onChange={(e) => setForm((p) => p && { ...p, free_from: e.target.value })}
                   className="input" placeholder="Не указано" />
               </div>
             </div>
-            <div className="rounded-lg border border-neutral-200 p-2.5">
+
+            {/* Polygon status */}
+            <div className="rounded-lg border border-neutral-200 p-2.5 space-y-2">
               {form.geojson ? (
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-1 flex-wrap">
                   <span className="flex items-center gap-1.5 text-xs text-success-700">
-                    <CheckCircle2 size={13} className="text-success-500" /> Зона нарисована
+                    <CheckCircle2 size={13} className="text-success-500 flex-shrink-0" />
+                    Зона нарисована
                   </span>
-                  <button onClick={() => setMapMode("draw")} className="btn-ghost btn-sm text-xs px-2">
+                  <button onClick={() => setMapMode("draw")} className="btn-ghost btn-sm text-xs px-2 flex-shrink-0">
                     <PenLine size={12} /> Перерисовать
                   </button>
                 </div>
@@ -362,7 +431,34 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
                   {mapMode === "draw" ? "Кликайте по карте, нажмите «Завершить»" : "Нарисуйте зону на карте →"}
                 </p>
               )}
+
+              {/* GeoJSON import */}
+              <button
+                onClick={() => setShowImport((v) => !v)}
+                className="flex items-center gap-1.5 text-xs text-neutral-400 hover:text-neutral-600 w-full"
+              >
+                <FileJson size={12} />
+                {showImport ? "Скрыть импорт" : "Импорт GeoJSON"}
+              </button>
+              {showImport && (
+                <div className="space-y-1.5">
+                  <textarea
+                    value={importText}
+                    onChange={(e) => setImportText(e.target.value)}
+                    className="input text-xs font-mono h-20 resize-none"
+                    placeholder='{"type":"Polygon","coordinates":[...]}'
+                  />
+                  <button
+                    onClick={importGeoJSON}
+                    disabled={!importText.trim()}
+                    className="btn-secondary btn-sm w-full text-xs"
+                  >
+                    Применить
+                  </button>
+                </div>
+              )}
             </div>
+
             {formError && (
               <p className="text-xs text-danger-600 bg-danger-50 px-3 py-2 rounded-lg">{formError}</p>
             )}
@@ -381,6 +477,7 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
         <DeliveryZoneMap
           key={mapKey}
           zones={mapZones}
+          previewGeojson={form?.geojson ?? null}
           mode={mapMode}
           onPolygonComplete={handlePolygonComplete}
           onDrawCancel={() => setMapMode(form?.geojson ? "view" : "draw")}
