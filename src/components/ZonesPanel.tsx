@@ -21,6 +21,8 @@ export type FullZone = DeliveryZone & {
   delivery_fee: number;
   free_from: number | null;
   min_order: number;
+  yookassa_shop_id: string | null;
+  yookassa_secret_key: string | null;
 };
 
 type ZoneForm = {
@@ -30,6 +32,8 @@ type ZoneForm = {
   free_from: string;
   min_order: string;
   geojson: ZoneGeoJSON | null;
+  yookassa_shop_id: string;
+  yookassa_secret_key: string;
 };
 
 type ZoneBase = {
@@ -40,10 +44,13 @@ type ZoneBase = {
   geojson: ZoneGeoJSON;
   is_active: boolean;
   sort_order: number;
+  yookassa_shop_id: string | null;
+  yookassa_secret_key: string | null;
 };
 
 const EMPTY_FORM: ZoneForm = {
   id: null, name: "", delivery_fee: "0", free_from: "", min_order: "0", geojson: null,
+  yookassa_shop_id: "", yookassa_secret_key: "",
 };
 
 type Props = {
@@ -116,6 +123,7 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [mapKey, setMapKey] = useState(0);
   const [formError, setFormError] = useState("");
+  const [showSecretKey, setShowSecretKey] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -131,7 +139,7 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
     setLoading(true);
     const { data, error } = await supabase
       .from("delivery_zones")
-      .select("id, name, delivery_fee, free_from, min_order, geojson, is_active, sort_order")
+      .select("id, name, delivery_fee, free_from, min_order, geojson, is_active, sort_order, yookassa_shop_id, yookassa_secret_key")
       .eq("city_id", cityId)
       .order("sort_order")
       .order("created_at");
@@ -169,7 +177,10 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
       free_from: zone.free_from === null ? "" : String(zone.free_from),
       min_order: String(zone.min_order),
       geojson: zone.geojson,
+      yookassa_shop_id: zone.yookassa_shop_id ?? "",
+      yookassa_secret_key: zone.yookassa_secret_key ?? "",
     });
+    setShowSecretKey(false);
     setMapMode("view");
     resetFormState();
   }
@@ -240,6 +251,8 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
       geojson: form.geojson!,
       is_active: true,
       sort_order: form.id ? (zones.find((z) => z.id === form.id)?.sort_order ?? 0) : zones.length,
+      yookassa_shop_id: form.yookassa_shop_id.trim() || null,
+      yookassa_secret_key: form.yookassa_secret_key.trim() || null,
     };
 
     try {
@@ -387,6 +400,41 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
                 <input id="zone-free-from" type="number" min="0" value={form.free_from}
                   onChange={(e) => setForm((p) => p && { ...p, free_from: e.target.value })}
                   className="input" placeholder="Не указано" />
+              </div>
+            </div>
+
+            {/* YooKassa */}
+            <div className="rounded-lg border border-neutral-200 p-2.5 space-y-2">
+              <p className="text-xs font-medium text-neutral-600">ЮКасса</p>
+              <div>
+                <label htmlFor="zone-shop-id" className="label">Shop ID</label>
+                <input
+                  id="zone-shop-id"
+                  value={form.yookassa_shop_id}
+                  onChange={(e) => setForm((p) => p && { ...p, yookassa_shop_id: e.target.value })}
+                  className="input"
+                  placeholder="123456"
+                />
+              </div>
+              <div>
+                <label htmlFor="zone-secret-key" className="label">Секретный ключ</label>
+                <div className="relative">
+                  <input
+                    id="zone-secret-key"
+                    type={showSecretKey ? "text" : "password"}
+                    value={form.yookassa_secret_key}
+                    onChange={(e) => setForm((p) => p && { ...p, yookassa_secret_key: e.target.value })}
+                    className="input pr-8"
+                    placeholder="live_…"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowSecretKey((v) => !v)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600"
+                  >
+                    {showSecretKey ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
               </div>
             </div>
 
