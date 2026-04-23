@@ -10,7 +10,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import {
   Plus, GripVertical, Edit2, Trash2, Eye, EyeOff,
-  Loader2, CheckCircle2, PenLine, FileJson,
+  Loader2, CheckCircle2, PenLine,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
@@ -116,8 +116,6 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [mapKey, setMapKey] = useState(0);
   const [formError, setFormError] = useState("");
-  const [showImport, setShowImport] = useState(false);
-  const [importText, setImportText] = useState("");
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -154,8 +152,6 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
 
   function resetFormState() {
     setFormError("");
-    setShowImport(false);
-    setImportText("");
   }
 
   function openAdd() {
@@ -188,38 +184,9 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
     setMapMode("view");
   }
 
-  function importGeoJSON() {
-    try {
-      const parsed = JSON.parse(importText.trim());
-      let geojson: ZoneGeoJSON | null = null;
-
-      if (parsed.type === "Polygon") {
-        geojson = parsed as ZoneGeoJSON;
-      } else if (parsed.type === "Feature" && parsed.geometry?.type === "Polygon") {
-        geojson = parsed.geometry as ZoneGeoJSON;
-      } else if (parsed.type === "FeatureCollection" && Array.isArray(parsed.features)) {
-        const poly = parsed.features.find((f: any) => f.geometry?.type === "Polygon");
-        if (poly) geojson = poly.geometry as ZoneGeoJSON;
-      }
-
-      if (geojson === null) {
-        toast.error("Не найден полигон в GeoJSON");
-        return;
-      }
-
-      setForm((prev) => prev ? { ...prev, geojson } : prev);
-      setShowImport(false);
-      setImportText("");
-      setMapKey((k) => k + 1);
-      toast.success("Зона импортирована");
-    } catch {
-      toast.error("Некорректный JSON");
-    }
-  }
-
   function validate(f: ZoneForm): string {
     if (!f.name.trim()) return "Введите название зоны";
-    if (!f.geojson) return "Нарисуйте или импортируйте зону";
+    if (!f.geojson) return "Нарисуйте зону на карте";
     if (Number.isNaN(Number(f.delivery_fee)) || Number(f.delivery_fee) < 0) return "Некорректная стоимость доставки";
     if (Number.isNaN(Number(f.min_order)) || Number(f.min_order) < 0) return "Некорректный минимальный заказ";
     const free = f.free_from.trim() ? Number(f.free_from) : null;
@@ -275,12 +242,17 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
       sort_order: form.id ? (zones.find((z) => z.id === form.id)?.sort_order ?? 0) : zones.length,
     };
 
-    if (isPending) {
-      applyPendingZone(base, form.id);
-    } else {
-      await applyDbZone(base, form.id);
+    try {
+      if (isPending) {
+        applyPendingZone(base, form.id);
+      } else {
+        await applyDbZone(base, form.id);
+      }
+    } catch {
+      setFormError("Не удалось сохранить зону");
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   }
 
   async function toggleZone(zone: FullZone) {
@@ -432,31 +404,6 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
                 </p>
               )}
 
-              {/* GeoJSON import */}
-              <button
-                onClick={() => setShowImport((v) => !v)}
-                className="flex items-center gap-1.5 text-xs text-neutral-400 hover:text-neutral-600 w-full"
-              >
-                <FileJson size={12} />
-                {showImport ? "Скрыть импорт" : "Импорт GeoJSON"}
-              </button>
-              {showImport && (
-                <div className="space-y-1.5">
-                  <textarea
-                    value={importText}
-                    onChange={(e) => setImportText(e.target.value)}
-                    className="input text-xs font-mono h-20 resize-none"
-                    placeholder='{"type":"Polygon","coordinates":[...]}'
-                  />
-                  <button
-                    onClick={importGeoJSON}
-                    disabled={!importText.trim()}
-                    className="btn-secondary btn-sm w-full text-xs"
-                  >
-                    Применить
-                  </button>
-                </div>
-              )}
             </div>
 
             {formError && (
