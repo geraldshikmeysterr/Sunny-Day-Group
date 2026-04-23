@@ -1,9 +1,10 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { Plus, Trash2, X, Loader2, Eye, EyeOff, Edit2, Phone, Mail, MessageCircle } from "lucide-react";
+import { Plus, Trash2, X, Loader2, Eye, EyeOff, Edit2, Phone, Mail, MessageCircle, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import CityZonesModal from "@/components/CityZonesModal";
 
 type City = {
   id: string; name: string; region: string | null; is_active: boolean;
@@ -45,6 +46,7 @@ export default function CitiesPage() {
   const [saving,    setSaving]    = useState(false);
   const [deleting,  setDeleting]  = useState<string | null>(null);
   const [error,     setError]     = useState("");
+  const [zonesModal, setZonesModal] = useState<City | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -247,6 +249,7 @@ export default function CitiesPage() {
                     </td>
                     <td>
                       <div className="flex items-center justify-end gap-0.5">
+                        <button onClick={() => setZonesModal(city)} className="btn-ghost btn-sm text-neutral-400" title="Зоны доставки"><MapPin size={14}/></button>
                         <button onClick={() => openEdit(city)} className="btn-ghost btn-sm text-brand-500"><Edit2 size={14}/></button>
                         <button onClick={() => toggleCity(city.id, city.is_active)} className="btn-ghost btn-sm text-neutral-400">
                           {city.is_active ? <EyeOff size={14}/> : <Eye size={14}/>}
@@ -344,6 +347,14 @@ export default function CitiesPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {zonesModal && (
+        <CityZonesModal
+          cityId={zonesModal.id}
+          cityName={zonesModal.name}
+          onClose={() => setZonesModal(null)}
+        />
       )}
 
       {editModal && (

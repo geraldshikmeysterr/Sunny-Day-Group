@@ -346,7 +346,7 @@ DO $$
 DECLARE
   t text;
 BEGIN
-  FOREACH t IN ARRAY ARRAY['orders','menu_items','categories','city_menu_items','carousel_cards','promocodes','cities','operators','admins','restaurants'] LOOP
+  FOREACH t IN ARRAY ARRAY['orders','menu_items','categories','city_menu_items','carousel_cards','promocodes','cities','operators','admins','restaurants','delivery_zones'] LOOP
     EXECUTE format('
       DROP TRIGGER IF EXISTS audit_%I ON %I;
       CREATE TRIGGER audit_%I
@@ -356,6 +356,78 @@ BEGIN
   END LOOP;
 END;
 $$;
+
+
+-- =============================================================================
+-- TABLE: delivery_zones
+-- Admins: full CRUD; Operators: SELECT own city (incl. inactive); Public: SELECT active only
+--
+-- Structure (for reference):
+--   id uuid, city_id uuid FK→cities, name text,
+--   delivery_fee numeric, free_from numeric, min_order numeric,
+--   geojson jsonb, zone_polygon geography, is_active boolean,
+--   sort_order int, created_at timestamptz, updated_at timestamptz
+--
+-- Notes:
+--   - "public read active" allows anon/mobile app to read is_active=true zones
+--   - Operators see ALL zones for their city (incl. inactive) via delivery_zones_select
+--   - Only superadmin can INSERT/UPDATE/DELETE (cities page is ADMIN_ONLY_ROUTE)
+--   - audit_trigger_fn() logs all writes to audit_log
+-- =============================================================================
+ALTER TABLE delivery_zones ENABLE ROW LEVEL SECURITY;
+
+-- updated_at: uses shared fn_update_updated_at() like all other tables
+ALTER TABLE delivery_zones
+  ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now() NOT NULL;
+
+DROP TRIGGER IF EXISTS delivery_zones_updated_at ON delivery_zones;
+CREATE TRIGGER delivery_zones_updated_at
+  BEFORE UPDATE ON delivery_zones
+  FOR EACH ROW EXECUTE FUNCTION fn_update_updated_at();
+
+-- CHECK constraints: prevent negative monetary values
+ALTER TABLE delivery_zones
+  DROP CONSTRAINT IF EXISTS delivery_zones_fee_non_negative;
+ALTER TABLE delivery_zones
+  ADD CONSTRAINT delivery_zones_fee_non_negative CHECK (delivery_fee >= 0);
+
+ALTER TABLE delivery_zones
+  DROP CONSTRAINT IF EXISTS delivery_zones_min_order_non_negative;
+ALTER TABLE delivery_zones
+  ADD CONSTRAINT delivery_zones_min_order_non_negative CHECK (min_order >= 0);
+
+ALTER TABLE delivery_zones
+  DROP CONSTRAINT IF EXISTS delivery_zones_free_from_positive;
+ALTER TABLE delivery_zones
+  ADD CONSTRAINT delivery_zones_free_from_positive CHECK (free_from IS NULL OR free_from >= 0);
+
+-- DROP old policy: used fn_is_admin() (legacy name), no explicit WITH CHECK
+DROP POLICY IF EXISTS "delivery_zones: admin all" ON delivery_zones;
+
+-- Superadmin: full CRUD with explicit WITH CHECK (consistent with all other tables)
+DROP POLICY IF EXISTS "delivery_zones_write_admin" ON delivery_zones;
+CREATE POLICY "delivery_zones_write_admin" ON delivery_zones
+  FOR ALL USING (is_admin()) WITH CHECK (is_admin());
+
+-- Operators: SELECT only, city-scoped (includes inactive zones — needed for admin panel)
+DROP POLICY IF EXISTS "delivery_zones_select" ON delivery_zones;
+CREATE POLICY "delivery_zones_select" ON delivery_zones
+  FOR SELECT USING (
+    is_admin()
+    OR city_id = operator_city_id()
+  );
+
+-- Public / mobile app: active zones only (no auth required — anon GRANT already exists)
+-- Policy name kept as-is to match what is already in the DB.
+DROP POLICY IF EXISTS "delivery_zones: public read active" ON delivery_zones;
+CREATE POLICY "delivery_zones: public read active" ON delivery_zones
+  FOR SELECT USING (is_active = true);
+
+-- GRANT: service_role, anon, authenticated already granted at table creation.
+-- If re-creating the table from scratch, run:
+--   GRANT SELECT ON delivery_zones TO anon;
+--   GRANT ALL ON delivery_zones TO authenticated;
+--   GRANT ALL ON delivery_zones TO service_role;
 
 
 -- =============================================================================

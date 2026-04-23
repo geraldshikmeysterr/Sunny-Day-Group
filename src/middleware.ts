@@ -13,11 +13,14 @@ const ADMIN_ONLY_ROUTES = [
 function buildCsp(nonce: string): string {
   return [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
+    // https://api-maps.yandex.ru and https://yastatic.net are fallbacks for browsers
+    // that don't propagate strict-dynamic trust to dynamically injected scripts
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://api-maps.yandex.ru https://yastatic.net`,
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
-    "img-src 'self' data: blob: https://supabase.shilmeyster.ru",
-    "connect-src 'self' https://supabase.shilmeyster.ru wss://supabase.shilmeyster.ru",
+    "img-src 'self' data: blob: https://supabase.shilmeyster.ru https://*.maps.yandex.net https://yastatic.net",
+    "connect-src 'self' https://supabase.shilmeyster.ru wss://supabase.shilmeyster.ru https://api-maps.yandex.ru https://yastatic.net https://*.maps.yandex.net",
+    "worker-src blob: 'self'",
     "frame-ancestors 'none'",
     "object-src 'none'",
     "base-uri 'self'",
