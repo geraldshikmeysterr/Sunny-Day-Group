@@ -220,7 +220,7 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
       toast.success(formId ? "Зона обновлена" : "Зона добавлена");
       setForm(null);
       setMapMode("view");
-      await fetchZones();
+      fetchZones();
       setMapKey((k) => k + 1);
     }
   }
@@ -246,10 +246,14 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
       if (isPending) {
         applyPendingZone(base, form.id);
       } else {
-        await applyDbZone(base, form.id);
+        const timeout = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Время ожидания истекло")), 10000)
+        );
+        await Promise.race([applyDbZone(base, form.id), timeout]);
       }
-    } catch {
-      setFormError("Не удалось сохранить зону");
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Не удалось сохранить зону";
+      setFormError(msg);
     } finally {
       setSaving(false);
     }

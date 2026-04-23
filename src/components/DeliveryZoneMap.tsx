@@ -150,6 +150,7 @@ function addDraggableMarker(
   d: DrawState,
   hoveredRef: { current: any },
   insertAt: number,
+  onDelete: (dot: any) => void,
 ) {
   const dot = new ymaps.Placemark(coords, {}, {
     preset: "islands#circleDotIcon", iconColor: "#F57300", draggable: true, cursor: "grab",
@@ -163,8 +164,10 @@ function addDraggableMarker(
   });
   dot.events.add("mouseenter", () => { hoveredRef.current = dot; });
   dot.events.add("mouseleave", () => { if (hoveredRef.current === dot) hoveredRef.current = null; });
+  dot.events.add("contextmenu", () => { onDelete(dot); });
   map.geoObjects.add(dot);
   d.markers.splice(insertAt, 0, dot);
+  hoveredRef.current = dot;
 }
 
 export default function DeliveryZoneMap({
@@ -264,7 +267,7 @@ export default function DeliveryZoneMap({
         const insertAt = findInsertIndex(d.points, coords);
         d.points.splice(insertAt, 0, coords);
         setPointCount(d.points.length);
-        addDraggableMarker(ymaps, map, coords, d, hoveredMarkerRef, insertAt);
+        addDraggableMarker(ymaps, map, coords, d, hoveredMarkerRef, insertAt, deletePoint);
         updateDrawPreview(ymaps, map, d);
       });
     });
@@ -326,7 +329,8 @@ export default function DeliveryZoneMap({
 
   return (
     <div className="relative w-full h-full min-h-64 rounded-xl overflow-hidden">
-      <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
+      <div ref={containerRef} role="application" style={{ width: "100%", height: "100%" }}
+        onContextMenu={(e) => { if (mode === "draw") e.preventDefault(); }} />
 
       {mode === "draw" && (
         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 bg-white/95 backdrop-blur-sm rounded-full shadow-md px-3 py-1.5 text-xs whitespace-nowrap">
