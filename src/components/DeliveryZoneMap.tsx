@@ -109,6 +109,28 @@ function updateDrawPreview(ymaps: any, map: any, d: DrawState) {
   map.geoObjects.add(d.preview);
 }
 
+// Returns squared distance from point p to segment [a, b] (all in [lat, lng]).
+function distToSegmentSq(p: [number, number], a: [number, number], b: [number, number]): number {
+  const dx = b[0] - a[0], dy = b[1] - a[1];
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return (p[0] - a[0]) ** 2 + (p[1] - a[1]) ** 2;
+  const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / lenSq));
+  return (p[0] - (a[0] + t * dx)) ** 2 + (p[1] - (a[1] + t * dy)) ** 2;
+}
+
+// Returns the index at which to splice a new point so it lands on the nearest edge.
+// With <2 points just appends; with ≥2 treats the path as a closed ring.
+function findInsertIndex(points: [number, number][], p: [number, number]): number {
+  if (points.length < 2) return points.length;
+  let minDist = Infinity;
+  let insertAt = points.length;
+  for (let i = 0; i < points.length; i++) {
+    const d = distToSegmentSq(p, points[i], points[(i + 1) % points.length]);
+    if (d < minDist) { minDist = d; insertAt = i + 1; }
+  }
+  return insertAt;
+}
+
 // Removes a specific marker (by reference) from the draw state.
 function removeMarkerAt(map: any, d: DrawState, dot: any): number {
   const idx = d.markers.indexOf(dot);
@@ -119,14 +141,15 @@ function removeMarkerAt(map: any, d: DrawState, dot: any): number {
   return d.points.length;
 }
 
-// Creates a draggable marker. Uses indexOf(dot) in the drag handler so spliced
-// arrays don't break coordinate updates after arbitrary point deletions.
+// Creates a draggable marker at insertAt position. Uses indexOf(dot) in the drag
+// handler so subsequent splices never break coordinate updates.
 function addDraggableMarker(
   ymaps: any,
   map: any,
   coords: [number, number],
   d: DrawState,
   hoveredRef: { current: any },
+  insertAt: number,
 ) {
   const dot = new ymaps.Placemark(coords, {}, {
     preset: "islands#circleDotIcon", iconColor: "#F57300", draggable: true, cursor: "grab",
@@ -141,7 +164,7 @@ function addDraggableMarker(
   dot.events.add("mouseenter", () => { hoveredRef.current = dot; });
   dot.events.add("mouseleave", () => { if (hoveredRef.current === dot) hoveredRef.current = null; });
   map.geoObjects.add(dot);
-  d.markers.push(dot);
+  d.markers.splice(insertAt, 0, dot);
 }
 
 export default function DeliveryZoneMap({
@@ -238,9 +261,10 @@ export default function DeliveryZoneMap({
         if (modeRef.current !== "draw") return;
         const coords: [number, number] = e.get("coords");
         const d = drawRef.current;
-        d.points.push(coords);
+        const insertAt = findInsertIndex(d.points, coords);
+        d.points.splice(insertAt, 0, coords);
         setPointCount(d.points.length);
-        addDraggableMarker(ymaps, map, coords, d, hoveredMarkerRef);
+        addDraggableMarker(ymaps, map, coords, d, hoveredMarkerRef, insertAt);
         updateDrawPreview(ymaps, map, d);
       });
     });
