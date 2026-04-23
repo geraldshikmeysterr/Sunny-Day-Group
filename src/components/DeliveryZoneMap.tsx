@@ -1,10 +1,7 @@
 "use client";
-import { useEffect, useRef, useCallback } from "react";
-import { MapPin, Pencil, X } from "lucide-react";
+import { useEffect, useRef, useState, useCallback } from "react";
+import { MapPin, X, Check } from "lucide-react";
 
-// GeoJSON Polygon geometry as stored in delivery_zones.geojson
-// Coordinates follow GeoJSON spec: [longitude, latitude]
-// Yandex Maps uses [latitude, longitude] — conversion happens inside this component.
 export type ZoneGeoJSON = {
   type: "Polygon";
   coordinates: [number, number][][];
@@ -19,96 +16,74 @@ export type DeliveryZone = {
 };
 
 type Props = {
-  // Zones to render as polygons on the map.
   zones: DeliveryZone[];
-  // 'view'  — read-only, shows all zones.
-  // 'draw'  — allows the user to draw a new polygon by clicking.
   mode: "view" | "draw";
-  // Called with the completed GeoJSON polygon when the user closes the polygon.
   onPolygonComplete?: (geojson: ZoneGeoJSON) => void;
-  // Called when the user cancels drawing (Escape or cancel button).
   onDrawCancel?: () => void;
-  // Optional centre for the initial map view [lat, lng].
-  // Defaults to the centroid of the first zone, or Moscow if no zones exist.
   center?: [number, number];
 };
 
-const DEFAULT_CENTER: [number, number] = [55.751244, 37.618423]; // Moscow
+const DEFAULT_CENTER: [number, number] = [55.751244, 37.618423];
 const DEFAULT_ZOOM = 11;
-const YANDEX_MAPS_URL = `https://api-maps.yandex.ru/2.1/?apikey=${process.env.NEXT_PUBLIC_YANDEX_MAPS_KEY ?? ""}&lang=ru_RU`;
 
-// Convert GeoJSON [lng, lat] pairs to Yandex Maps [lat, lng] pairs.
-function geojsonToYmaps(coords: [number, number][]): [number, number][] {
+// GeoJSON: [lng, lat] → Yandex Maps: [lat, lng]
+function toYmaps(coords: [number, number][]): [number, number][] {
   return coords.map(([lng, lat]) => [lat, lng]);
 }
-
-// Convert Yandex Maps [lat, lng] pairs back to GeoJSON [lng, lat] pairs.
-function ymapsToGeojson(coords: [number, number][]): [number, number][] {
+// Yandex Maps: [lat, lng] → GeoJSON: [lng, lat]
+function toGeojson(coords: [number, number][]): [number, number][] {
   return coords.map(([lat, lng]) => [lng, lat]);
 }
 
 declare global {
-  interface Window {
-    ymaps: any;
-    _ymapsReady: boolean;
-    _ymapsCallbacks: Array<() => void>;
-  }
+  // var declarations extend globalThis (required for globalThis.x access)
+  var ymaps: any;
+  var _ymapsReady: boolean;
+  var _ymapsCallbacks: Array<() => void>;
 }
 
-// Loads the Yandex Maps 2.1 script once per page, regardless of how many
-// DeliveryZoneMap instances are mounted. Extra calls reuse the same promise.
-function loadYandexMaps(): Promise<void> {
-  if (typeof window === "undefined") return Promise.resolve();
-  if (window._ymapsReady) return Promise.resolve();
+function onYmapsScriptLoad() {
+  globalThis.ymaps.ready(() => {
+    globalThis._ymapsReady = true;
+    (globalThis._ymapsCallbacks ?? []).forEach((cb) => cb());
+    globalThis._ymapsCallbacks = [];
+  });
+}
+
+function loadYandexMaps(apiKey: string): Promise<void> {
+  if (globalThis.window === undefined) return Promise.resolve();
+  if (globalThis._ymapsReady) return Promise.resolve();
 
   return new Promise((resolve) => {
-    if (!window._ymapsCallbacks) window._ymapsCallbacks = [];
-    window._ymapsCallbacks.push(resolve);
-
+    if (!globalThis._ymapsCallbacks) globalThis._ymapsCallbacks = [];
+    globalThis._ymapsCallbacks.push(resolve);
     if (document.querySelector(`script[src^="https://api-maps.yandex.ru"]`)) return;
 
     const script = document.createElement("script");
-    script.src = YANDEX_MAPS_URL;
+    script.src = `https://api-maps.yandex.ru/2.1/?apikey=${apiKey}&lang=ru_RU`;
     script.async = true;
-    script.onload = () => {
-      window.ymaps.ready(() => {
-        window._ymapsReady = true;
-        window._ymapsCallbacks.forEach((cb) => cb());
-        window._ymapsCallbacks = [];
-      });
-    };
+    script.onload = onYmapsScriptLoad;
     document.head.appendChild(script);
   });
 }
 
-export default function DeliveryZoneMap({
-  zones,
-  mode,
-  onPolygonComplete,
-  onDrawCancel,
-  center,
-}: Props) {
+export default function DeliveryZoneMap({ zones, mode, onPolygonComplete, onDrawCancel, center }: Props) {
+  const apiKey = process.env.NEXT_PUBLIC_YANDEX_MAPS_KEY ?? "";
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
-  const drawingRef = useRef<{
-    points: [number, number][];
-    polyline: any;
-    markers: any[];
-  }>({ points: [], polyline: null, markers: [] });
+  const drawRef = useRef<{ points: [number, number][]; polyline: any; markers: any[] }>(
+    { points: [], polyline: null, markers: [] }
+  );
+  const [pointCount, setPointCount] = useState(0);
 
-  const apiKeyMissing = !process.env.NEXT_PUBLIC_YANDEX_MAPS_KEY;
-
-  // ------------------------------------------------------------------
-  // Helpers
-  // ------------------------------------------------------------------
-
-  const getMapCenter = useCallback((): [number, number] => {
+  const getCenter = useCallback((): [number, number] => {
     if (center) return center;
     if (zones.length > 0) {
-      const coords = zones[0].geojson.coordinates[0];
-      const lat = coords.reduce((s, c) => s + c[1], 0) / coords.length;
-      const lng = coords.reduce((s, c) => s + c[0], 0) / coords.length;
-      return [lat, lng];
+      const c = zones[0].geojson.coordinates[0];
+      return [
+        c.reduce((s, p) => s + p[1], 0) / c.length,
+        c.reduce((s, p) => s + p[0], 0) / c.length,
+      ];
     }
     return DEFAULT_CENTER;
   }, [center, zones]);
@@ -116,127 +91,115 @@ export default function DeliveryZoneMap({
   const clearDrawing = useCallback(() => {
     const map = mapRef.current;
     if (!map) return;
-    const { polyline, markers } = drawingRef.current;
+    const { polyline, markers } = drawRef.current;
     if (polyline) map.geoObjects.remove(polyline);
     markers.forEach((m) => map.geoObjects.remove(m));
-    drawingRef.current = { points: [], polyline: null, markers: [] };
+    drawRef.current = { points: [], polyline: null, markers: [] };
+    setPointCount(0);
   }, []);
 
-  // ------------------------------------------------------------------
-  // Map initialisation
-  // ------------------------------------------------------------------
+  const completePolygon = useCallback(() => {
+    const d = drawRef.current;
+    if (d.points.length < 3) return;
+    const closed = [...d.points, d.points[0]];
+    const geojson: ZoneGeoJSON = { type: "Polygon", coordinates: [toGeojson(closed)] };
+    clearDrawing();
+    onPolygonComplete?.(geojson);
+  }, [clearDrawing, onPolygonComplete]);
+
+  const handleCancel = useCallback(() => {
+    clearDrawing();
+    onDrawCancel?.();
+  }, [clearDrawing, onDrawCancel]);
 
   useEffect(() => {
-    if (apiKeyMissing || !containerRef.current) return;
-
+    if (!apiKey || !containerRef.current) return;
     let destroyed = false;
 
-    loadYandexMaps().then(() => {
+    loadYandexMaps(apiKey).then(() => {
       if (destroyed || !containerRef.current) return;
 
       const ymaps = window.ymaps;
-      const map = new ymaps.Map(containerRef.current, {
-        center: getMapCenter(),
-        zoom: DEFAULT_ZOOM,
-        controls: ["zoomControl", "fullscreenControl"],
-      });
+      const map = new ymaps.Map(
+        containerRef.current,
+        { center: getCenter(), zoom: DEFAULT_ZOOM, controls: ["zoomControl", "fullscreenControl"] },
+        { suppressMapOpenBlock: true }
+      );
       mapRef.current = map;
 
-      // Render existing zones
       zones.forEach((zone) => {
         const polygon = new ymaps.Polygon(
-          [geojsonToYmaps(zone.geojson.coordinates[0])],
+          [toYmaps(zone.geojson.coordinates[0])],
           { hintContent: zone.name },
           {
             fillColor: zone.is_active ? "#F5730030" : "#94a3b830",
             strokeColor: zone.is_active ? "#F57300" : "#94a3b8",
             strokeWidth: 2,
-            opacity: 0.8,
+            // transparent to events so clicks on polygon still register on map
+            interactivityModel: "default#transparent",
           }
         );
         map.geoObjects.add(polygon);
       });
 
-      // Drawing mode: click to place points, double-click to close polygon
       if (mode === "draw") {
         map.events.add("click", (e: any) => {
           const coords: [number, number] = e.get("coords");
-          const d = drawingRef.current;
+          const d = drawRef.current;
           d.points.push(coords);
+          setPointCount(d.points.length);
 
-          // Dot marker at each vertex
-          const dot = new ymaps.Placemark(coords, {}, {
-            preset: "islands#circleDotIcon",
-            iconColor: "#F57300",
-          });
+          const dot = new ymaps.Placemark(
+            coords, {},
+            {
+              preset: "islands#circleDotIcon",
+              iconColor: "#F57300",
+              // critical: don't let markers intercept subsequent map clicks
+              interactivityModel: "default#transparent",
+            }
+          );
           map.geoObjects.add(dot);
           d.markers.push(dot);
 
-          // Update preview polyline
           if (d.polyline) map.geoObjects.remove(d.polyline);
           if (d.points.length >= 2) {
             d.polyline = new ymaps.Polyline(
-              [...d.points, d.points[0]],
-              {},
-              { strokeColor: "#F57300", strokeWidth: 2, strokeStyle: "dash" }
+              [...d.points, d.points[0]], {},
+              {
+                strokeColor: "#F57300",
+                strokeWidth: 2,
+                strokeStyle: "dash",
+                interactivityModel: "default#transparent",
+              }
             );
             map.geoObjects.add(d.polyline);
           }
-        });
-
-        map.events.add("dblclick", (e: any) => {
-          e.preventDefault();
-          const d = drawingRef.current;
-          if (d.points.length < 3) return;
-
-          const closed = [...d.points, d.points[0]];
-          const geojson: ZoneGeoJSON = {
-            type: "Polygon",
-            coordinates: [ymapsToGeojson(closed)],
-          };
-          clearDrawing();
-          onPolygonComplete?.(geojson);
         });
       }
     });
 
     return () => {
       destroyed = true;
-      if (mapRef.current) {
-        mapRef.current.destroy();
-        mapRef.current = null;
-      }
+      if (mapRef.current) { mapRef.current.destroy(); mapRef.current = null; }
     };
-  // Zones and mode are intentionally excluded: the map re-initialises only
-  // when the component mounts. Zone updates are handled by the parent by
-  // unmounting/remounting with a key prop.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apiKeyMissing]);
-
-  // ------------------------------------------------------------------
-  // Keyboard: Escape cancels drawing
-  // ------------------------------------------------------------------
+  }, [apiKey]);
 
   useEffect(() => {
     if (mode !== "draw") return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") { clearDrawing(); onDrawCancel?.(); }
-    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") handleCancel(); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [mode, clearDrawing, onDrawCancel]);
+  }, [mode, handleCancel]);
 
-  // ------------------------------------------------------------------
-  // Render
-  // ------------------------------------------------------------------
-
-  if (apiKeyMissing) {
+  if (!apiKey) {
     return (
       <div className="flex flex-col items-center justify-center gap-3 h-full min-h-64 bg-neutral-50 rounded-xl border-2 border-dashed border-neutral-200 text-neutral-400">
         <MapPin size={32} className="text-neutral-300" />
         <p className="text-sm font-medium">Карта недоступна</p>
         <p className="text-xs text-center px-6">
-          Добавьте <code className="bg-neutral-100 px-1 rounded">NEXT_PUBLIC_YANDEX_MAPS_KEY</code> в <code className="bg-neutral-100 px-1 rounded">.env.local</code>
+          Добавьте <code className="bg-neutral-100 px-1 rounded">NEXT_PUBLIC_YANDEX_MAPS_KEY</code> в{" "}
+          <code className="bg-neutral-100 px-1 rounded">.env.local</code>
         </p>
       </div>
     );
@@ -244,17 +207,28 @@ export default function DeliveryZoneMap({
 
   return (
     <div className="relative w-full h-full min-h-64 rounded-xl overflow-hidden">
-      <div ref={containerRef} className="w-full h-full" />
+      {/* map container — explicit style height so Yandex Maps gets real dimensions */}
+      <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
 
       {mode === "draw" && (
-        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 bg-white/95 backdrop-blur-sm rounded-full shadow-md px-4 py-2 text-sm pointer-events-none">
-          <Pencil size={13} className="text-brand-500" />
-          <span>Кликайте по карте, чтобы нанести точки. Двойной клик — завершить.</span>
-          <button
-            className="pointer-events-auto btn-ghost btn-sm ml-1"
-            onClick={() => { clearDrawing(); onDrawCancel?.(); }}
-          >
-            <X size={13} />
+        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 bg-white/95 backdrop-blur-sm rounded-full shadow-md px-3 py-1.5 text-sm">
+          {pointCount < 3 ? (
+            <span className="text-neutral-500">
+              Кликайте по карте — нужно минимум 3 точки{pointCount > 0 ? ` (${pointCount})` : ""}
+            </span>
+          ) : (
+            <>
+              <span className="text-neutral-500">{pointCount} точек</span>
+              <button
+                onClick={completePolygon}
+                className="flex items-center gap-1 bg-brand-500 hover:bg-brand-600 text-white rounded-full px-3 py-1 text-xs font-medium transition-colors"
+              >
+                <Check size={12} /> Завершить
+              </button>
+            </>
+          )}
+          <button onClick={handleCancel} className="text-neutral-400 hover:text-neutral-600 ml-1">
+            <X size={14} />
           </button>
         </div>
       )}

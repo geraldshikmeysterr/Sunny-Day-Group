@@ -1,10 +1,10 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { Plus, Trash2, X, Loader2, Eye, EyeOff, Edit2, Phone, Mail, MessageCircle, MapPin } from "lucide-react";
+import { Plus, Trash2, X, Loader2, Eye, EyeOff, Edit2, Phone, Mail, MessageCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import CityZonesModal from "@/components/CityZonesModal";
+import ZonesPanel, { type FullZone } from "@/components/ZonesPanel";
 
 type City = {
   id: string; name: string; region: string | null; is_active: boolean;
@@ -36,17 +36,18 @@ async function callEdgeFunction(name: string, body: object, token: string) {
 
 export default function CitiesPage() {
   const supabase = createClient();
-  const [cities,    setCities]    = useState<City[]>([]);
-  const [operators, setOperators] = useState<Record<string, Operator>>({});
-  const [loading,   setLoading]   = useState(true);
-  const [addModal,  setAddModal]  = useState(false);
-  const [editModal, setEditModal] = useState<City | null>(null);
-  const [addForm,   setAddForm]   = useState(EMPTY_ADD);
-  const [editForm,  setEditForm]  = useState(EMPTY_EDIT);
-  const [saving,    setSaving]    = useState(false);
-  const [deleting,  setDeleting]  = useState<string | null>(null);
-  const [error,     setError]     = useState("");
-  const [zonesModal, setZonesModal] = useState<City | null>(null);
+  const [cities,       setCities]       = useState<City[]>([]);
+  const [operators,    setOperators]    = useState<Record<string, Operator>>({});
+  const [loading,      setLoading]      = useState(true);
+  const [addModal,     setAddModal]     = useState(false);
+  const [editModal,    setEditModal]    = useState<City | null>(null);
+  const [addForm,      setAddForm]      = useState(EMPTY_ADD);
+  const [editForm,     setEditForm]     = useState(EMPTY_EDIT);
+  const [saving,       setSaving]       = useState(false);
+  const [deleting,     setDeleting]     = useState<string | null>(null);
+  const [error,        setError]        = useState("");
+  // Zones collected while creating a new city (no city_id yet)
+  const [pendingZones, setPendingZones] = useState<FullZone[]>([]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -94,15 +95,16 @@ export default function CitiesPage() {
 
       if (result.city?.id) {
         const socials: any = {};
-        if (addForm.city_phone)    socials.phone         = addForm.city_phone;
-        if (addForm.city_email)    socials.email         = addForm.city_email;
-        if (addForm.city_telegram) socials.telegram      = addForm.city_telegram;
-        if (addForm.city_instagram)socials.instagram     = addForm.city_instagram;
-        if (addForm.city_vk)       socials.vk            = addForm.city_vk;
-        if (addForm.city_max)      socials.max_messenger = addForm.city_max;
+        if (addForm.city_phone)     socials.phone         = addForm.city_phone;
+        if (addForm.city_email)     socials.email         = addForm.city_email;
+        if (addForm.city_telegram)  socials.telegram      = addForm.city_telegram;
+        if (addForm.city_instagram) socials.instagram     = addForm.city_instagram;
+        if (addForm.city_vk)        socials.vk            = addForm.city_vk;
+        if (addForm.city_max)       socials.max_messenger = addForm.city_max;
         if (Object.keys(socials).length > 0) {
           await supabase.from("cities").update(socials).eq("id", result.city.id);
         }
+
         try {
           const { data: menuItems } = await supabase
             .from("menu_items").select("id").eq("is_global_active", true);
@@ -112,11 +114,27 @@ export default function CitiesPage() {
               { onConflict: "city_id,menu_item_id" }
             );
           }
-        } catch {}
+        } catch { /* menu items are non-critical */ }
+
+        // Save any delivery zones drawn during city creation
+        if (pendingZones.length > 0) {
+          await supabase.from("delivery_zones").insert(
+            pendingZones.map((z, i) => ({
+              city_id:      result.city.id,
+              name:         z.name,
+              delivery_fee: z.delivery_fee,
+              min_order:    z.min_order,
+              free_from:    z.free_from,
+              geojson:      z.geojson,
+              is_active:    z.is_active,
+              sort_order:   i,
+            }))
+          );
+        }
       }
 
       toast.success(`Город «${result.city?.name ?? addForm.city_name}» создан`);
-      setAddModal(false); setAddForm(EMPTY_ADD); await fetchData();
+      setAddModal(false); setAddForm(EMPTY_ADD); setPendingZones([]); await fetchData();
     } catch (e: any) { setError(e.message); }
     setSaving(false);
   }
@@ -154,9 +172,7 @@ export default function CitiesPage() {
             existing_city_id: editModal.id,
           }, token);
           toast.success("Оператор сменён");
-        } catch (e: any) {
-          toast.error(e.message ?? "Ошибка создания оператора");
-        }
+        } catch (e: any) { toast.error(e.message ?? "Ошибка создания оператора"); }
       }
 
       toast.success("Город сохранён");
@@ -193,6 +209,101 @@ export default function CitiesPage() {
     setEditModal(city); setError("");
   }
 
+  // ------------------------------------------------------------------
+  // Shared form section component
+  // ------------------------------------------------------------------
+
+  function CityFormFields({ prefix, form, setForm }: {
+    prefix: "add" | "edit";
+    form: typeof addForm | typeof editForm;
+    setForm: (v: any) => void;
+  }) {
+    const f = form as any;
+    const isAdd = prefix === "add";
+    return (
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="col-span-2">
+            <label className="label">Название города *</label>
+            <input value={isAdd ? f.city_name : f.name}
+              onChange={e => setForm((p: any) => ({ ...p, [isAdd ? "city_name" : "name"]: e.target.value }))}
+              className="input" placeholder="Новосибирск" />
+          </div>
+          <div className="col-span-2">
+            <label className="label">Регион</label>
+            <input value={isAdd ? f.city_region : f.region}
+              onChange={e => setForm((p: any) => ({ ...p, [isAdd ? "city_region" : "region"]: e.target.value }))}
+              className="input" placeholder="Необязательно" />
+          </div>
+        </div>
+
+        <div className="border-t border-neutral-200 pt-4">
+          <p className="text-sm font-semibold text-neutral-700 mb-3">Контакты города</p>
+          <div className="grid grid-cols-2 gap-3">
+            {([
+              { key: isAdd ? "city_phone" : "phone",     icon: <Phone size={13} />,         ph: "+7 (999) 000-00-00" },
+              { key: isAdd ? "city_email" : "email",     icon: <Mail size={13} />,          ph: "city@operator.ru", type: "email" },
+              { key: isAdd ? "city_telegram" : "telegram", icon: null,                      ph: "@solnechniy_den",  label: "Telegram" },
+              { key: isAdd ? "city_instagram" : "instagram", icon: null,                    ph: "@solnechniy_den",  label: "Instagram" },
+              { key: isAdd ? "city_vk" : "vk",           icon: null,                        ph: "https://vk.com/…", label: "ВКонтакте" },
+              { key: isAdd ? "city_max" : "max",         icon: null,                        ph: "@solnechniy_den",  label: "Max" },
+            ] as any[]).map(({ key, icon, ph, type, label }) => (
+              <div key={key}>
+                {label && <label className="label">{label}</label>}
+                {icon ? (
+                  <div className="relative">{icon && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400">{icon}</span>}
+                    <input type={type ?? "text"} value={f[key] ?? ""} onChange={e => setForm((p: any) => ({ ...p, [key]: e.target.value }))}
+                      className="input pl-8 text-sm" placeholder={ph} />
+                  </div>
+                ) : (
+                  <input type={type ?? "text"} value={f[key] ?? ""} onChange={e => setForm((p: any) => ({ ...p, [key]: e.target.value }))}
+                    className="input text-sm" placeholder={ph} />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="border-t border-neutral-200 pt-4">
+          <p className="text-sm font-semibold text-neutral-700 mb-1">
+            {isAdd ? "Оператор города" : "Сменить оператора"}
+          </p>
+          {!isAdd && operators[editModal?.id ?? ""] && (
+            <p className="text-xs text-neutral-500 bg-neutral-50 rounded-lg px-3 py-2 mb-3">
+              Текущий: <span className="font-medium">{operators[editModal!.id].email}</span>
+            </p>
+          )}
+          {!isAdd && <p className="text-xs text-neutral-400 mb-3">Оставьте пустым — оператор останется прежним</p>}
+          <div className="space-y-3">
+            <div>
+              <label className="label">Email {isAdd ? "*" : "нового оператора"}</label>
+              <input type="email" value={isAdd ? f.operator_email : f.op_email}
+                onChange={e => setForm((p: any) => ({ ...p, [isAdd ? "operator_email" : "op_email"]: e.target.value }))}
+                className="input" placeholder="city@operator.ru" autoComplete="new-password" />
+            </div>
+            <div>
+              <label className="label">Пароль {isAdd ? "*" : ""}</label>
+              <div className="relative">
+                <input type={f.showPw ? "text" : "password"}
+                  value={isAdd ? f.operator_password : f.op_password}
+                  onChange={e => setForm((p: any) => ({ ...p, [isAdd ? "operator_password" : "op_password"]: e.target.value }))}
+                  className="input pr-20" autoComplete="new-password" placeholder="Минимум 8 символов" />
+                <button type="button" onClick={() => setForm((p: any) => ({ ...p, showPw: !p.showPw }))}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-neutral-400 hover:text-neutral-600">
+                  {f.showPw ? "Скрыть" : "Показать"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ------------------------------------------------------------------
+  // Render
+  // ------------------------------------------------------------------
+
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-5">
       <div className="flex items-center justify-between">
@@ -200,13 +311,13 @@ export default function CitiesPage() {
           <h1 className="text-3xl font-bold text-neutral-900">Города</h1>
           <p className="text-sm text-neutral-500 mt-0.5">{cities.length} городов</p>
         </div>
-        <button onClick={() => { setAddModal(true); setError(""); setAddForm(EMPTY_ADD); }} className="btn-primary btn-md">
+        <button onClick={() => { setAddModal(true); setError(""); setAddForm(EMPTY_ADD); setPendingZones([]); }} className="btn-primary btn-md">
           <Plus size={16} /> Новый город
         </button>
       </div>
 
       {loading ? (
-        <div className="space-y-2">{Array.from({ length: 3 }, (_, i) => i).map(i => (
+        <div className="space-y-2">{Array.from({ length: 3 }, (_, i) => (
           <div key={`sk-${i}`} className="card p-4"><div className="skeleton h-5 w-32 mb-2" /><div className="skeleton h-4 w-48" /></div>
         ))}</div>
       ) : (
@@ -224,9 +335,7 @@ export default function CitiesPage() {
                     <td className="font-semibold text-neutral-900">{city.name}</td>
                     <td className="text-neutral-500 text-sm">{city.region ?? "—"}</td>
                     <td>
-                      {op ? (
-                        <p className="text-sm">{op.email}</p>
-                      ) : <span className="text-neutral-400 italic text-sm">Не назначен</span>}
+                      {op ? <p className="text-sm">{op.email}</p> : <span className="text-neutral-400 italic text-sm">Не назначен</span>}
                     </td>
                     <td>
                       {hasContacts ? (
@@ -249,7 +358,6 @@ export default function CitiesPage() {
                     </td>
                     <td>
                       <div className="flex items-center justify-end gap-0.5">
-                        <button onClick={() => setZonesModal(city)} className="btn-ghost btn-sm text-neutral-400" title="Зоны доставки"><MapPin size={14}/></button>
                         <button onClick={() => openEdit(city)} className="btn-ghost btn-sm text-brand-500"><Edit2 size={14}/></button>
                         <button onClick={() => toggleCity(city.id, city.is_active)} className="btn-ghost btn-sm text-neutral-400">
                           {city.is_active ? <EyeOff size={14}/> : <Eye size={14}/>}
@@ -268,176 +376,82 @@ export default function CitiesPage() {
         </div>
       )}
 
+      {/* ------------------------------------------------------------------ */}
+      {/* Add modal                                                           */}
+      {/* ------------------------------------------------------------------ */}
       {addModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-card-lg w-full max-w-lg max-h-[90vh] flex flex-col animate-scale-in">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-200">
+          <div className="bg-white rounded-2xl shadow-card-lg w-full max-w-5xl h-[88vh] flex flex-col animate-scale-in overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-200 flex-shrink-0">
               <h2 className="text-xl font-semibold">Новый город</h2>
               <button onClick={() => setAddModal(false)} className="btn-ghost btn-sm"><X size={16}/></button>
             </div>
-            <div className="overflow-y-auto flex-1 p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="col-span-2">
-                  <label htmlFor="add-city-name" className="label">Название города *</label>
-                  <input id="add-city-name" value={addForm.city_name} onChange={e => setAddForm(p => ({...p, city_name: e.target.value}))} className="input" placeholder="Новосибирск"/>
+
+            <div className="flex flex-1 min-h-0">
+              {/* Left: city form */}
+              <div className="w-96 flex-shrink-0 border-r border-neutral-200 flex flex-col">
+                <div className="overflow-y-auto flex-1 p-6">
+                  <CityFormFields prefix="add" form={addForm} setForm={setAddForm} />
                 </div>
-                <div className="col-span-2">
-                  <label htmlFor="add-city-region" className="label">Регион</label>
-                  <input id="add-city-region" value={addForm.city_region} onChange={e => setAddForm(p => ({...p, city_region: e.target.value}))} className="input" placeholder="Необязательно"/>
+                {error && <p className="text-sm text-danger-600 bg-danger-50 mx-6 mb-2 px-3 py-2 rounded-lg">{error}</p>}
+                <div className="flex justify-end gap-2 px-6 py-4 border-t border-neutral-200 flex-shrink-0">
+                  <button onClick={() => setAddModal(false)} className="btn-secondary btn-md">Отмена</button>
+                  <button onClick={createCity} disabled={saving} className="btn-primary btn-md">
+                    {saving && <Loader2 size={14} className="animate-spin"/>} Создать
+                  </button>
                 </div>
               </div>
 
-              <div className="border-t border-neutral-200 pt-4">
-                <p className="text-sm font-semibold text-neutral-700 mb-3">Контакты города</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label htmlFor="add-city-phone" className="label">Телефон</label>
-                    <div className="relative"><Phone size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"/>
-                      <input id="add-city-phone" value={addForm.city_phone} onChange={e => setAddForm(p => ({...p, city_phone: e.target.value}))} className="input pl-8 text-sm" placeholder="+7 (999) 000-00-00"/>
-                    </div>
-                  </div>
-                  <div>
-                    <label htmlFor="add-city-email" className="label">Email</label>
-                    <div className="relative"><Mail size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"/>
-                      <input id="add-city-email" type="email" value={addForm.city_email} onChange={e => setAddForm(p => ({...p, city_email: e.target.value}))} className="input pl-8 text-sm" placeholder="city@operator.ru"/>
-                    </div>
-                  </div>
-                  <div>
-                    <label htmlFor="add-city-telegram" className="label">Telegram</label>
-                    <input id="add-city-telegram" value={addForm.city_telegram} onChange={e => setAddForm(p => ({...p, city_telegram: e.target.value}))} className="input text-sm" placeholder="@solnechniy_den"/>
-                  </div>
-                  <div>
-                    <label htmlFor="add-city-instagram" className="label">Instagram</label>
-                    <input id="add-city-instagram" value={addForm.city_instagram} onChange={e => setAddForm(p => ({...p, city_instagram: e.target.value}))} className="input text-sm" placeholder="@solnechniy_den"/>
-                  </div>
-                  <div>
-                    <label htmlFor="add-city-vk" className="label">ВКонтакте</label>
-                    <input id="add-city-vk" value={addForm.city_vk} onChange={e => setAddForm(p => ({...p, city_vk: e.target.value}))} className="input text-sm" placeholder="https://vk.com/..."/>
-                  </div>
-                  <div>
-                    <label htmlFor="add-city-max" className="label">Max</label>
-                    <input id="add-city-max" value={addForm.city_max} onChange={e => setAddForm(p => ({...p, city_max: e.target.value}))} className="input text-sm" placeholder="@solnechniy_den"/>
-                  </div>
+              {/* Right: delivery zones panel */}
+              <div className="flex-1 flex flex-col min-h-0">
+                <div className="px-4 py-3 border-b border-neutral-100 flex-shrink-0">
+                  <p className="text-sm font-semibold text-neutral-700">Зоны доставки</p>
+                  <p className="text-xs text-neutral-400">Зоны будут сохранены при создании города</p>
+                </div>
+                <div className="flex-1 min-h-0">
+                  <ZonesPanel pendingZones={pendingZones} onPendingChange={setPendingZones} />
                 </div>
               </div>
-
-              <div className="border-t border-neutral-200 pt-4">
-                <p className="text-sm font-semibold text-neutral-700 mb-3">Оператор города</p>
-                <div className="space-y-3">
-                  <div>
-                    <label htmlFor="add-op-email" className="label">Email *</label>
-                    <input id="add-op-email" type="email" value={addForm.operator_email} onChange={e => setAddForm(p => ({...p, operator_email: e.target.value}))} className="input" placeholder="city@operator.ru" autoComplete="new-password"/>
-                  </div>
-                  <div>
-                    <label htmlFor="add-op-password" className="label">Пароль *</label>
-                    <div className="relative">
-                      <input id="add-op-password" type={addForm.showPw ? "text" : "password"} value={addForm.operator_password} onChange={e => setAddForm(p => ({...p, operator_password: e.target.value}))} className="input pr-20" autoComplete="new-password" placeholder="Минимум 8 символов"/>
-                      <button type="button" onClick={() => setAddForm(p => ({...p, showPw: !p.showPw}))} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-neutral-400 hover:text-neutral-600">{addForm.showPw ? "Скрыть" : "Показать"}</button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            {error && <p className="text-sm text-danger-600 bg-danger-50 mx-6 mb-2 px-3 py-2 rounded-lg">{error}</p>}
-            <div className="flex justify-end gap-2 px-6 py-4 border-t border-neutral-200">
-              <button onClick={() => setAddModal(false)} className="btn-secondary btn-md">Отмена</button>
-              <button onClick={createCity} disabled={saving} className="btn-primary btn-md">
-                {saving && <Loader2 size={14} className="animate-spin"/>} Создать
-              </button>
             </div>
           </div>
         </div>
       )}
 
-      {zonesModal && (
-        <CityZonesModal
-          cityId={zonesModal.id}
-          cityName={zonesModal.name}
-          onClose={() => setZonesModal(null)}
-        />
-      )}
-
+      {/* ------------------------------------------------------------------ */}
+      {/* Edit modal                                                          */}
+      {/* ------------------------------------------------------------------ */}
       {editModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-card-lg w-full max-w-lg max-h-[90vh] flex flex-col animate-scale-in">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-200">
+          <div className="bg-white rounded-2xl shadow-card-lg w-full max-w-5xl h-[88vh] flex flex-col animate-scale-in overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-200 flex-shrink-0">
               <h2 className="text-xl font-semibold">Редактировать город</h2>
               <button onClick={() => setEditModal(null)} className="btn-ghost btn-sm"><X size={16}/></button>
             </div>
-            <div className="overflow-y-auto flex-1 p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label htmlFor="edit-city-name" className="label">Название города *</label>
-                  <input id="edit-city-name" value={editForm.name} onChange={e => setEditForm(p => ({...p, name: e.target.value}))} className="input" placeholder="Новосибирск"/>
+
+            <div className="flex flex-1 min-h-0">
+              {/* Left: city form */}
+              <div className="w-96 flex-shrink-0 border-r border-neutral-200 flex flex-col">
+                <div className="overflow-y-auto flex-1 p-6">
+                  <CityFormFields prefix="edit" form={editForm} setForm={setEditForm} />
                 </div>
-                <div>
-                  <label htmlFor="edit-city-region" className="label">Регион</label>
-                  <input id="edit-city-region" value={editForm.region} onChange={e => setEditForm(p => ({...p, region: e.target.value}))} className="input" placeholder="Необязательно"/>
+                <div className="flex justify-end gap-2 px-6 py-4 border-t border-neutral-200 flex-shrink-0">
+                  <button onClick={() => setEditModal(null)} className="btn-secondary btn-md">Отмена</button>
+                  <button onClick={saveCity} disabled={saving} className="btn-primary btn-md">
+                    {saving && <Loader2 size={14} className="animate-spin"/>} Сохранить
+                  </button>
                 </div>
               </div>
 
-              <div className="border-t border-neutral-200 pt-4">
-                <p className="text-sm font-semibold text-neutral-700 mb-3">Контакты города</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label htmlFor="edit-city-phone" className="label">Телефон</label>
-                    <div className="relative"><Phone size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"/>
-                      <input id="edit-city-phone" value={editForm.phone} onChange={e => setEditForm(p => ({...p, phone: e.target.value}))} className="input pl-8 text-sm" placeholder="+7 (999) 000-00-00"/>
-                    </div>
-                  </div>
-                  <div>
-                    <label htmlFor="edit-city-email" className="label">Email</label>
-                    <div className="relative"><Mail size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"/>
-                      <input id="edit-city-email" type="email" value={editForm.email} onChange={e => setEditForm(p => ({...p, email: e.target.value}))} className="input pl-8 text-sm" placeholder="city@operator.ru"/>
-                    </div>
-                  </div>
-                  <div>
-                    <label htmlFor="edit-city-telegram" className="label">Telegram</label>
-                    <input id="edit-city-telegram" value={editForm.telegram} onChange={e => setEditForm(p => ({...p, telegram: e.target.value}))} className="input text-sm" placeholder="@solnechniy_den"/>
-                  </div>
-                  <div>
-                    <label htmlFor="edit-city-instagram" className="label">Instagram</label>
-                    <input id="edit-city-instagram" value={editForm.instagram} onChange={e => setEditForm(p => ({...p, instagram: e.target.value}))} className="input text-sm" placeholder="@solnechniy_den"/>
-                  </div>
-                  <div>
-                    <label htmlFor="edit-city-vk" className="label">ВКонтакте</label>
-                    <input id="edit-city-vk" value={editForm.vk} onChange={e => setEditForm(p => ({...p, vk: e.target.value}))} className="input text-sm" placeholder="https://vk.com/..."/>
-                  </div>
-                  <div>
-                    <label htmlFor="edit-city-max" className="label">Max</label>
-                    <input id="edit-city-max" value={editForm.max} onChange={e => setEditForm(p => ({...p, max: e.target.value}))} className="input text-sm" placeholder="@solnechniy_den"/>
-                  </div>
+              {/* Right: delivery zones panel */}
+              <div className="flex-1 flex flex-col min-h-0">
+                <div className="px-4 py-3 border-b border-neutral-100 flex-shrink-0">
+                  <p className="text-sm font-semibold text-neutral-700">Зоны доставки</p>
+                  <p className="text-xs text-neutral-400">Изменения применяются сразу</p>
+                </div>
+                <div className="flex-1 min-h-0">
+                  <ZonesPanel cityId={editModal.id} />
                 </div>
               </div>
-
-              <div className="border-t border-neutral-200 pt-4">
-                {operators[editModal.id] && (
-                  <p className="text-xs text-neutral-500 bg-neutral-50 rounded-lg px-3 py-2 mb-3">
-                    Текущий оператор: <span className="font-medium">{operators[editModal.id].email}</span>
-                  </p>
-                )}
-                <p className="text-sm font-semibold text-neutral-700 mb-1">Сменить оператора</p>
-                <p className="text-xs text-neutral-400 mb-3">Оставьте пустым — оператор останется прежним</p>
-                <div className="space-y-3">
-                  <div>
-                    <label htmlFor="edit-op-email" className="label">Email нового оператора</label>
-                    <input id="edit-op-email" type="email" value={editForm.op_email} onChange={e => setEditForm(p => ({...p, op_email: e.target.value}))} className="input" placeholder="city@operator.ru" autoComplete="off"/>
-                  </div>
-                  <div>
-                    <label htmlFor="edit-op-password" className="label">Пароль</label>
-                    <div className="relative">
-                      <input id="edit-op-password" type={editForm.showPw ? "text" : "password"} value={editForm.op_password} onChange={e => setEditForm(p => ({...p, op_password: e.target.value}))} className="input pr-20"/>
-                      <button type="button" onClick={() => setEditForm(p => ({...p, showPw: !p.showPw}))} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-neutral-400 hover:text-neutral-600">{editForm.showPw ? "Скрыть" : "Показать"}</button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 px-6 py-4 border-t border-neutral-200">
-              <button onClick={() => setEditModal(null)} className="btn-secondary btn-md">Отмена</button>
-              <button onClick={saveCity} disabled={saving} className="btn-primary btn-md">
-                {saving && <Loader2 size={14} className="animate-spin"/>} Сохранить
-              </button>
             </div>
           </div>
         </div>
