@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useAdmin } from "@/components/layout/AdminContext";
 import { Plus, Edit2, X, Loader2, Search } from "lucide-react";
@@ -11,7 +11,9 @@ const EMPTY = { address: "", working_hours: "", coords: "", is_active: false, ci
 
 export default function RestaurantsPage() {
   const { isAdmin, cityIds: opCityIds } = useAdmin() as any;
-  const supabase = createClient();
+  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
+  if (!supabaseRef.current) supabaseRef.current = createClient();
+  const supabase = supabaseRef.current;
   const [restaurants, setRestaurants] = useState<any[]>([]);
   const [cities, setCities] = useState<any[]>([]);
   const [cityFilters, setCityFilters] = useState<string[]>([]);
@@ -68,9 +70,13 @@ export default function RestaurantsPage() {
         is_active: form.is_active,
         city_id: form.city_id || opCityIds[0],
       };
-      const { error } = modal.editing
-        ? await supabase.from("restaurants").update(payload).eq("id", modal.editing.id)
-        : await supabase.from("restaurants").insert(payload);
+      const dbCall = modal.editing
+        ? supabase.from("restaurants").update(payload).eq("id", modal.editing.id)
+        : supabase.from("restaurants").insert(payload);
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Сервер не отвечает, попробуйте ещё раз")), 12000)
+      );
+      const { error } = await Promise.race([dbCall, timeoutPromise]);
       if (error) { toast.error(error.message); return; }
       toast.success(modal.editing ? "Ресторан обновлён" : "Ресторан добавлен");
       setModal({ open: false, editing: null });
