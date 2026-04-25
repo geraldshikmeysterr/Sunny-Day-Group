@@ -225,7 +225,15 @@ export default function CitiesPage() {
     setDeleting(city.id);
     try {
       await supabase.from("delivery_zones").delete().eq("city_id", city.id);
-      await supabase.from("cities").delete().eq("id", city.id);
+      const { error } = await supabase.from("cities").delete().eq("id", city.id);
+      if (error) {
+        toast.error(
+          error.code === "23503"
+            ? "Нельзя удалить город — в нём есть история заказов"
+            : error.message
+        );
+        return;
+      }
       setCities(p => p.filter(c => c.id !== city.id));
       toast.success("Город удалён");
     } catch (e: any) { toast.error(e.message); }
