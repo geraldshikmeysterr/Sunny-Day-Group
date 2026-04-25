@@ -15,8 +15,16 @@ export type DeliveryZone = {
   sort_order: number;
 };
 
+export type RestaurantMarker = {
+  id: string;
+  address: string;
+  lat: number;
+  lng: number;
+};
+
 type Props = {
   zones: DeliveryZone[];
+  restaurants?: RestaurantMarker[];
   previewGeojson?: ZoneGeoJSON | null;
   mode: "view" | "draw";
   onPolygonComplete?: (geojson: ZoneGeoJSON) => void;
@@ -175,17 +183,19 @@ export type DeliveryZoneMapHandle = {
 };
 
 const DeliveryZoneMap = forwardRef<DeliveryZoneMapHandle, Props>(function DeliveryZoneMap({
-  zones, previewGeojson, mode, onPolygonComplete, onDrawCancel, center,
+  zones, restaurants, previewGeojson, mode, onPolygonComplete, onDrawCancel, center,
 }, ref) {
   const apiKey = process.env.NEXT_PUBLIC_YANDEX_MAPS_KEY ?? "";
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const drawRef = useRef<DrawState>({ points: [], preview: null, previewType: null, markers: [] });
   const previewRef = useRef<any>(null);
+  const restaurantMarkersRef = useRef<any[]>([]);
   const hoveredMarkerRef = useRef<any>(null);
   const modeRef = useRef(mode);
   modeRef.current = mode;
   const [pointCount, setPointCount] = useState(0);
+  const [mapReady, setMapReady] = useState(false);
 
   const getCenter = useCallback((): [number, number] => {
     if (center) return center;
@@ -253,6 +263,7 @@ const DeliveryZoneMap = forwardRef<DeliveryZoneMapHandle, Props>(function Delive
         { suppressMapOpenBlock: true }
       );
       mapRef.current = map;
+      setMapReady(true);
 
       zones.forEach((zone) => {
         map.geoObjects.add(new ymaps.Polygon(
@@ -302,6 +313,25 @@ const DeliveryZoneMap = forwardRef<DeliveryZoneMapHandle, Props>(function Delive
       map.geoObjects.add(previewRef.current);
     }
   }, [previewGeojson]);
+
+  // Add/update restaurant markers whenever the restaurants list or map readiness changes.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady || !globalThis.ymaps) return;
+
+    restaurantMarkersRef.current.forEach((m) => map.geoObjects.remove(m));
+    restaurantMarkersRef.current = [];
+
+    (restaurants ?? []).forEach((r) => {
+      const marker = new globalThis.ymaps.Placemark(
+        [r.lat, r.lng],
+        { hintContent: r.address, balloonContent: r.address },
+        { preset: "islands#darkBlueIcon", interactivityModel: "default#opaque" }
+      );
+      map.geoObjects.add(marker);
+      restaurantMarkersRef.current.push(marker);
+    });
+  }, [restaurants, mapReady]);
 
   // Keyboard shortcuts (active only in draw mode).
   useEffect(() => {

@@ -15,7 +15,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import DeliveryZoneMap, { type ZoneGeoJSON, type DeliveryZone, type DeliveryZoneMapHandle } from "./DeliveryZoneMap";
+import DeliveryZoneMap, { type ZoneGeoJSON, type DeliveryZone, type DeliveryZoneMapHandle, type RestaurantMarker } from "./DeliveryZoneMap";
 import { useEffect } from "react";
 
 export type FullZone = DeliveryZone & {
@@ -114,6 +114,7 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
   const isPending = !cityId;
 
   const [zones, setZones] = useState<FullZone[]>(pendingZones ?? []);
+  const [restaurants, setRestaurants] = useState<RestaurantMarker[]>([]);
   const [loading, setLoading] = useState(!isPending);
   const [mapMode, setMapMode] = useState<"view" | "draw">("view");
   const [form, setForm] = useState<ZoneForm | null>(null);
@@ -148,6 +149,17 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
   }, [cityId]);
 
   useEffect(() => { fetchZones(); }, [fetchZones]);
+
+  useEffect(() => {
+    if (!cityId) return;
+    supabase
+      .from("restaurants")
+      .select("id,address,lat,lng")
+      .eq("city_id", cityId)
+      .not("lat", "is", null)
+      .not("lng", "is", null)
+      .then(({ data }) => setRestaurants((data as RestaurantMarker[]) ?? []));
+  }, [cityId]);
 
   const syncPending = useCallback((updated: FullZone[]) => {
     if (isPending) onPendingChange?.(updated);
@@ -511,6 +523,7 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
           ref={mapRef}
           key={mapKey}
           zones={mapZones}
+          restaurants={restaurants}
           previewGeojson={form?.geojson ?? null}
           mode={mapMode}
           onPolygonComplete={handlePolygonComplete}
