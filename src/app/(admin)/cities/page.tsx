@@ -224,21 +224,17 @@ export default function CitiesPage() {
     if (!confirm(`Удалить город «${city.name}»?`)) return;
     setDeleting(city.id);
     try {
-      await supabase.from("delivery_zones").delete().eq("city_id", city.id);
-      const { error } = await supabase.from("cities").delete().eq("id", city.id);
-      if (error) {
-        if (error.code === "23503") {
-          setDeleting(null);
-          if (!confirm(`В городе «${city.name}» есть история заказов.\nУдалить все заказы этого города и затем сам город?`)) return;
-          setDeleting(city.id);
-          await supabase.from("orders").delete().eq("city_id", city.id);
-          const { error: err2 } = await supabase.from("cities").delete().eq("id", city.id);
-          if (err2) { toast.error(err2.message); return; }
-        } else {
-          toast.error(error.message);
-          return;
-        }
+      const { count } = await supabase
+        .from("orders").select("id", { count: "exact", head: true }).eq("city_id", city.id);
+      if (count && count > 0) {
+        setDeleting(null);
+        if (!confirm(`В городе «${city.name}» есть ${count} заказов.\nУдалить все заказы и сам город?`)) return;
+        setDeleting(city.id);
+        const { error: ordErr } = await supabase.from("orders").delete().eq("city_id", city.id);
+        if (ordErr) { toast.error(ordErr.message); setDeleting(null); return; }
       }
+      const { error } = await supabase.from("cities").delete().eq("id", city.id);
+      if (error) { toast.error(error.message); setDeleting(null); return; }
       setCities(p => p.filter(c => c.id !== city.id));
       toast.success("Город удалён");
     } catch (e: any) { toast.error(e.message); }
