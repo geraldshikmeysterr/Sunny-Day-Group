@@ -56,19 +56,28 @@ export default function RestaurantsPage() {
 
   async function save() {
     setSaving(true);
-    const [rawLat, rawLng] = form.coords.split(",").map(s => s.trim());
-    const payload = {
-      address: form.address,
-      working_hours: form.working_hours || null,
-      lat: rawLat ? Number.parseFloat(rawLat) : null,
-      lng: rawLng ? Number.parseFloat(rawLng) : null,
-      is_active: form.is_active,
-      city_id: form.city_id || opCityIds[0],
-    };
-    if (modal.editing) await supabase.from("restaurants").update(payload).eq("id", modal.editing.id);
-    else await supabase.from("restaurants").insert(payload);
-    toast.success(modal.editing ? "Ресторан обновлён" : "Ресторан добавлен");
-    setModal({ open: false, editing: null }); await fetchRestaurants(); setSaving(false);
+    try {
+      const [rawLat, rawLng] = form.coords.split(",").map(s => s.trim());
+      const payload = {
+        address: form.address,
+        working_hours: form.working_hours || null,
+        lat: rawLat ? Number.parseFloat(rawLat) : null,
+        lng: rawLng ? Number.parseFloat(rawLng) : null,
+        is_active: form.is_active,
+        city_id: form.city_id || opCityIds[0],
+      };
+      const { error } = modal.editing
+        ? await supabase.from("restaurants").update(payload).eq("id", modal.editing.id)
+        : await supabase.from("restaurants").insert(payload);
+      if (error) { toast.error(error.message); return; }
+      toast.success(modal.editing ? "Ресторан обновлён" : "Ресторан добавлен");
+      setModal({ open: false, editing: null });
+      await fetchRestaurants();
+    } catch (e: any) {
+      toast.error(e.message ?? "Ошибка сохранения");
+    } finally {
+      setSaving(false);
+    }
   }
 
   const getCityName = (id: string) => cities.find(c => c.id === id)?.name ?? "—";
