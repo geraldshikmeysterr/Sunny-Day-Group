@@ -7,17 +7,17 @@ import { toast } from "sonner";
 import ZonesPanel, { type FullZone } from "@/components/ZonesPanel";
 
 type City = {
-  id: string; name: string; region: string | null; is_active: boolean;
+  id: string; name: string; is_active: boolean;
   phone: string | null; email: string | null;
   telegram: string | null; instagram: string | null; vk: string | null; max_messenger: string | null;
 };
 
 type CityFields = {
-  name: string; region: string; phone: string; email: string;
+  name: string; phone: string; email: string;
   telegram: string; instagram: string; vk: string; max: string;
 };
 
-const EMPTY: CityFields = { name: "", region: "", phone: "", email: "", telegram: "", instagram: "", vk: "", max: "" };
+const EMPTY: CityFields = { name: "", phone: "", email: "", telegram: "", instagram: "", vk: "", max: "" };
 
 // ---------------------------------------------------------------------------
 // Phone formatter: +7 (XXX) XXX-XX-XX
@@ -72,12 +72,6 @@ function CityFormFields({ values, onChange }: {
           <input value={values.name}
             onChange={e => onChange("name", e.target.value)}
             className="input" placeholder="Новосибирск" />
-        </div>
-        <div>
-          <label className="label">Регион</label>
-          <input value={values.region}
-            onChange={e => onChange("region", e.target.value)}
-            className="input" placeholder="Необязательно" />
         </div>
       </div>
 
@@ -169,7 +163,7 @@ export default function CitiesPage() {
     setSaving(true); setError("");
     try {
       const { data: newCity, error: cityError } = await supabase
-        .from("cities").insert({ name: addForm.name, region: addForm.region || null })
+        .from("cities").insert({ name: addForm.name })
         .select().single();
       if (cityError) throw new Error(cityError.message);
 
@@ -215,7 +209,7 @@ export default function CitiesPage() {
     setSaving(true);
     try {
       await supabase.from("cities").update({
-        name: editForm.name, region: editForm.region || null,
+        name: editForm.name,
         phone: editForm.phone || null, email: editForm.email || null,
         telegram: editForm.telegram || null, instagram: editForm.instagram || null,
         vk: editForm.vk || null, max_messenger: editForm.max || null,
@@ -245,7 +239,7 @@ export default function CitiesPage() {
 
   function openEdit(city: City) {
     setEditForm({
-      name: city.name, region: city.region ?? "", phone: city.phone ?? "",
+      name: city.name, phone: city.phone ?? "",
       email: city.email ?? "", telegram: city.telegram ?? "", instagram: city.instagram ?? "",
       vk: city.vk ?? "", max: city.max_messenger ?? "",
     });
@@ -276,7 +270,7 @@ export default function CitiesPage() {
         <div className="card overflow-hidden">
           <table className="table">
             <thead>
-              <tr><th>Город</th><th>Регион</th><th>Контакты</th><th>Статус</th><th></th></tr>
+              <tr><th>Город</th><th>Контакты</th><th>Статус</th><th></th></tr>
             </thead>
             <tbody>
               {cities.map(city => {
@@ -284,7 +278,6 @@ export default function CitiesPage() {
                 return (
                   <tr key={city.id}>
                     <td className="font-semibold text-neutral-900">{city.name}</td>
-                    <td className="text-neutral-500 text-sm">{city.region ?? "—"}</td>
                     <td>
                       {hasContacts ? (
                         <div className="space-y-0.5 text-xs text-neutral-500">
@@ -318,7 +311,7 @@ export default function CitiesPage() {
                   </tr>
                 );
               })}
-              {!cities.length && <tr><td colSpan={5} className="py-16 text-center text-neutral-400">Городов пока нет</td></tr>}
+              {!cities.length && <tr><td colSpan={4} className="py-16 text-center text-neutral-400">Городов пока нет</td></tr>}
             </tbody>
           </table>
         </div>
