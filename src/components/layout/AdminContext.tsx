@@ -12,17 +12,32 @@ type AdminCtx = {
 const Ctx = createContext<AdminCtx>({ isAdmin: false, zoneIds: [], cityIds: [], loaded: false });
 
 export function AdminProvider({ children }: Readonly<{ children: React.ReactNode }>) {
+  const [userId, setUserId] = useState<string | null | undefined>(undefined);
   const [ctx, setCtx] = useState<AdminCtx>({ isAdmin: false, zoneIds: [], cityIds: [], loaded: false });
 
+  // Track auth state — NO DB calls inside the callback to avoid session-lock deadlock.
   useEffect(() => {
     const supabase = createClient();
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!session?.user) {
-        setCtx({ isAdmin: false, zoneIds: [], cityIds: [], loaded: true });
-        return;
-      }
-      const userId = session.user.id;
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUserId(session?.user?.id ?? null);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUserId(session?.user?.id ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
+  // Fetch role data after userId is known (outside the auth callback).
+  useEffect(() => {
+    if (userId === undefined) return;
+    if (userId === null) {
+      setCtx({ isAdmin: false, zoneIds: [], cityIds: [], loaded: true });
+      return;
+    }
+
+    const supabase = createClient();
+
+    async function fetchRole() {
       const { data: admin } = await supabase
         .from("admins").select("id").eq("id", userId).maybeSingle();
       if (admin) {
@@ -48,9 +63,10 @@ export function AdminProvider({ children }: Readonly<{ children: React.ReactNode
       )] as string[];
 
       setCtx({ isAdmin: false, zoneIds, cityIds, loaded: true });
-    });
-    return () => subscription.unsubscribe();
-  }, []);
+    }
+
+    fetchRole();
+  }, [userId]);
 
   return <Ctx.Provider value={ctx}>{children}</Ctx.Provider>;
 }
