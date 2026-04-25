@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { Plus, Trash2, X, Loader2, Eye, EyeOff, Edit2, Phone, Mail, MessageCircle } from "lucide-react";
+import { Plus, Trash2, X, Loader2, Eye, EyeOff, Edit2, Phone, Mail, MessageCircle, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import ZonesPanel, { type FullZone } from "@/components/ZonesPanel";
@@ -132,6 +132,7 @@ function CityFormFields({ values, onChange }: {
 export default function CitiesPage() {
   const supabase = createClient();
   const [cities,       setCities]       = useState<City[]>([]);
+  const [search,       setSearch]       = useState("");
   const [loading,      setLoading]      = useState(true);
   const [addModal,     setAddModal]     = useState(false);
   const [editModal,    setEditModal]    = useState<City | null>(null);
@@ -271,6 +272,13 @@ export default function CitiesPage() {
         </button>
       </div>
 
+      <div className="card p-4 flex flex-wrap gap-3 items-center sticky top-4 z-20 bg-white shadow-card">
+        <div className="relative flex-1 min-w-52">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Поиск по городу..." className="input pl-8 text-sm" autoComplete="off" />
+        </div>
+      </div>
+
       {loading ? (
         <div className="space-y-2">{Array.from({ length: 3 }, (_, i) => (
           <div key={`sk-${i}`} className="card p-4"><div className="skeleton h-5 w-32 mb-2" /><div className="skeleton h-4 w-48" /></div>
@@ -279,14 +287,14 @@ export default function CitiesPage() {
         <div className="card overflow-hidden">
           <table className="table">
             <thead>
-              <tr><th>Город</th><th>Контакты</th><th>Статус</th><th></th></tr>
+              <tr><th>Город</th><th>Контакты</th><th className="w-full"></th><th>Статус</th><th></th></tr>
             </thead>
             <tbody>
-              {cities.map(city => {
+              {cities.filter(c => !search || c.name.toLowerCase().includes(search.toLowerCase())).map(city => {
                 const hasContacts = city.phone || city.email || city.telegram || city.instagram || city.vk || city.max_messenger;
                 return (
-                  <tr key={city.id}>
-                    <td className="font-semibold text-neutral-900">{city.name}</td>
+                  <tr key={city.id} className="group">
+                    <td className="font-semibold text-neutral-900 whitespace-nowrap">{city.name}</td>
                     <td>
                       {hasContacts ? (
                         <div className="space-y-0.5 text-xs text-neutral-500">
@@ -301,13 +309,14 @@ export default function CitiesPage() {
                         </div>
                       ) : <span className="text-neutral-300 text-xs">—</span>}
                     </td>
-                    <td>
+                    <td></td>
+                    <td className="whitespace-nowrap">
                       <span className={cn("badge text-xs", city.is_active ? "bg-success-50 text-success-700" : "bg-neutral-100 text-neutral-500")}>
                         {city.is_active ? "Активен" : "Скрыт"}
                       </span>
                     </td>
                     <td>
-                      <div className="flex items-center justify-end gap-0.5">
+                      <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button onClick={() => openEdit(city)} className="btn-ghost btn-sm text-brand-500"><Edit2 size={14}/></button>
                         <button onClick={() => toggleCity(city.id, city.is_active)} className={cn("btn-ghost btn-sm", city.is_active ? "text-success-600" : "text-neutral-400")}>
                           {city.is_active ? <Eye size={14}/> : <EyeOff size={14}/>}
@@ -320,7 +329,7 @@ export default function CitiesPage() {
                   </tr>
                 );
               })}
-              {!cities.length && <tr><td colSpan={4} className="py-16 text-center text-neutral-400">Городов пока нет</td></tr>}
+              {!cities.length && <tr><td colSpan={5} className="py-16 text-center text-neutral-400">Городов пока нет</td></tr>}
             </tbody>
           </table>
         </div>

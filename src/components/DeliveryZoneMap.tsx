@@ -323,7 +323,7 @@ const DeliveryZoneMap = forwardRef<DeliveryZoneMapHandle, Props>(function Delive
     restaurantMarkersRef.current = [];
 
     const RestaurantLayout = globalThis.ymaps.templateLayoutFactory.createClass(
-      '<div style="width:18px;height:18px;background:#C2185B;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,0.4);color:#fff;font-size:8px;line-height:1;user-select:none">◆</div>'
+      '<div style="width:20px;height:20px;background:#C2185B;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,0.35)"><div style="width:6px;height:6px;background:#fff;border-radius:50%"></div></div>'
     );
     (restaurants ?? []).forEach((r) => {
       const marker = new globalThis.ymaps.Placemark(
@@ -331,8 +331,8 @@ const DeliveryZoneMap = forwardRef<DeliveryZoneMapHandle, Props>(function Delive
         { hintContent: r.address, balloonContent: r.address },
         {
           iconLayout: RestaurantLayout,
-          iconShape: { type: "Circle", coordinates: [0, 0], radius: 9 },
-          iconImageOffset: [-9, -9],
+          iconShape: { type: "Circle", coordinates: [0, 0], radius: 10 },
+          iconImageOffset: [-10, -10],
           interactivityModel: "default#opaque",
         }
       );
