@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import {
   DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors,
 } from "@dnd-kit/core";
@@ -16,6 +16,7 @@ import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import DeliveryZoneMap, { type ZoneGeoJSON, type DeliveryZone } from "./DeliveryZoneMap";
+import { useEffect } from "react";
 
 export type FullZone = DeliveryZone & {
   delivery_fee: number;
@@ -30,11 +31,9 @@ type ZoneForm = {
   free_from: string;
   min_order: string;
   geojson: ZoneGeoJSON | null;
-  operatorMode: "none" | "existing" | "new";
-  selectedOperatorId: string;
-  newOpEmail: string;
-  newOpPassword: string;
-  showNewOpPw: boolean;
+  opEmail: string;
+  opPassword: string;
+  showOpPw: boolean;
 };
 
 type ZoneBase = {
@@ -49,7 +48,7 @@ type ZoneBase = {
 
 const EMPTY_FORM: ZoneForm = {
   id: null, name: "", delivery_fee: "0", free_from: "", min_order: "0", geojson: null,
-  operatorMode: "none", selectedOperatorId: "", newOpEmail: "", newOpPassword: "", showNewOpPw: false,
+  opEmail: "", opPassword: "", showOpPw: false,
 };
 
 type Props = {
@@ -122,7 +121,6 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [mapKey, setMapKey] = useState(0);
   const [formError, setFormError] = useState("");
-  const [allOperators, setAllOperators] = useState<{ id: string; email: string }[]>([]);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -150,12 +148,6 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
 
   useEffect(() => { fetchZones(); }, [fetchZones]);
 
-  useEffect(() => {
-    if (isPending) return;
-    supabase.from("operators").select("id,email").order("email")
-      .then(({ data }) => setAllOperators(data ?? []));
-  }, [isPending]);
-
   const syncPending = useCallback((updated: FullZone[]) => {
     if (isPending) onPendingChange?.(updated);
   }, [isPending, onPendingChange]);
@@ -164,14 +156,10 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
   // Form helpers
   // ------------------------------------------------------------------
 
-  function resetFormState() {
-    setFormError("");
-  }
-
   function openAdd() {
     setForm({ ...EMPTY_FORM });
     setMapMode("draw");
-    resetFormState();
+    setFormError("");
   }
 
   function openEdit(zone: FullZone) {
@@ -182,23 +170,26 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
       free_from: zone.free_from === null ? "" : String(zone.free_from),
       min_order: String(zone.min_order),
       geojson: zone.geojson,
-      operatorMode: "none", selectedOperatorId: "", newOpEmail: "", newOpPassword: "", showNewOpPw: false,
+      opEmail: "", opPassword: "", showOpPw: false,
     });
     setMapMode("view");
-    resetFormState();
-    // Load current operator for this zone
-    supabase.from("operator_zones").select("operator_id").eq("zone_id", zone.id).maybeSingle()
+    setFormError("");
+    // Load current operator email for this zone
+    supabase
+      .from("operator_zones")
+      .select("operators(email)")
+      .eq("zone_id", zone.id)
+      .maybeSingle()
       .then(({ data }) => {
-        if (data?.operator_id) {
-          setForm(prev => prev ? { ...prev, operatorMode: "existing", selectedOperatorId: data.operator_id } : prev);
-        }
+        const email = (data?.operators as any)?.email ?? "";
+        if (email) setForm(prev => prev ? { ...prev, opEmail: email } : prev);
       });
   }
 
   function cancelForm() {
     setForm(null);
     setMapMode("view");
-    resetFormState();
+    setFormError("");
   }
 
   function handlePolygonComplete(geojson: ZoneGeoJSON) {
@@ -213,16 +204,17 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
     if (Number.isNaN(Number(f.min_order)) || Number(f.min_order) < 0) return "Некорректный минимальный заказ";
     const free = f.free_from.trim() ? Number(f.free_from) : null;
     if (free !== null && (Number.isNaN(free) || free < 0)) return "Некорректная сумма для бесплатной доставки";
-    if (!isPending && f.operatorMode === "new") {
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.newOpEmail)) return "Некорректный email оператора";
-      if (f.newOpPassword.length < 8 || !/[A-Z]/.test(f.newOpPassword) || !/\d/.test(f.newOpPassword))
+    if (!isPending) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.opEmail)) return "Некорректный email оператора";
+      // Password required only when creating new zone (no id yet)
+      if (!f.id && (f.opPassword.length < 8 || !/[A-Z]/.test(f.opPassword) || !/\d/.test(f.opPassword)))
         return "Пароль: минимум 8 символов, одна заглавная буква и одна цифра";
     }
     return "";
   }
 
   // ------------------------------------------------------------------
-  // CRUD helpers extracted to keep saveZone complexity low
+  // CRUD helpers
   // ------------------------------------------------------------------
 
   function applyPendingZone(base: ZoneBase, formId: string | null) {
@@ -236,7 +228,7 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
     setMapKey((k) => k + 1);
   }
 
-  async function createOperatorViaEdge(email: string, password: string): Promise<string> {
+  async function upsertOperator(email: string, password: string): Promise<string> {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error("Нет сессии");
     const res = await fetch(
@@ -248,7 +240,7 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
           "Authorization": `Bearer ${session.access_token}`,
           "apikey": process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
         },
-        body: JSON.stringify({ operator_email: email, operator_password: password }),
+        body: JSON.stringify({ operator_email: email, operator_password: password || undefined }),
       }
     );
     const data = await res.json();
@@ -257,14 +249,9 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
   }
 
   async function saveZoneOperator(zoneId: string, f: ZoneForm) {
+    const opId = await upsertOperator(f.opEmail, f.opPassword);
     await supabase.from("operator_zones").delete().eq("zone_id", zoneId);
-    if (f.operatorMode === "existing" && f.selectedOperatorId) {
-      await supabase.from("operator_zones").insert({ operator_id: f.selectedOperatorId, zone_id: zoneId });
-    } else if (f.operatorMode === "new" && f.newOpEmail) {
-      const opId = await createOperatorViaEdge(f.newOpEmail, f.newOpPassword);
-      await supabase.from("operator_zones").insert({ operator_id: opId, zone_id: zoneId });
-      setAllOperators(prev => [...prev, { id: opId, email: f.newOpEmail }]);
-    }
+    await supabase.from("operator_zones").insert({ operator_id: opId, zone_id: zoneId });
   }
 
   async function applyDbZone(base: ZoneBase, formId: string | null): Promise<string | null> {
@@ -303,7 +290,7 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
         applyPendingZone(base, savedForm.id);
       } else {
         const timeout = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("Время ожидания истекло")), 10000)
+          setTimeout(() => reject(new Error("Время ожидания истекло")), 15000)
         );
         const zoneId = await Promise.race([applyDbZone(base, savedForm.id), timeout]);
         if (zoneId) {
@@ -470,48 +457,29 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
                   {mapMode === "draw" ? "Кликайте по карте, нажмите «Завершить»" : "Нарисуйте зону на карте →"}
                 </p>
               )}
-
             </div>
 
             {!isPending && (
               <div className="rounded-lg border border-neutral-200 p-2.5 space-y-2">
-                <p className="text-xs font-semibold text-neutral-600">Оператор зоны</p>
-                <div className="space-y-1.5">
-                  {(["none", "existing", "new"] as const).map(mode => (
-                    <label key={mode} className="flex items-center gap-2 text-sm cursor-pointer">
-                      <input type="radio" name="opMode" value={mode}
-                        checked={form.operatorMode === mode}
-                        onChange={() => setForm(p => p && { ...p, operatorMode: mode, selectedOperatorId: "" })}
-                      />
-                      {mode === "none" ? "Без оператора" : mode === "existing" ? "Назначить" : "Создать нового"}
-                    </label>
-                  ))}
+                <p className="text-xs font-semibold text-neutral-600">Оператор *</p>
+                <input type="email" value={form.opEmail}
+                  onChange={e => setForm(p => p && { ...p, opEmail: e.target.value })}
+                  className="input text-sm" placeholder="email@operator.ru" autoComplete="new-password" />
+                <div className="relative">
+                  <input
+                    type={form.showOpPw ? "text" : "password"}
+                    value={form.opPassword}
+                    onChange={e => setForm(p => p && { ...p, opPassword: e.target.value })}
+                    className="input text-sm pr-16"
+                    placeholder={form.id ? "Пароль (не менять — оставить пустым)" : "Пароль *"}
+                    autoComplete="new-password"
+                  />
+                  <button type="button"
+                    onClick={() => setForm(p => p && { ...p, showOpPw: !p.showOpPw })}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-neutral-400 hover:text-neutral-600">
+                    {form.showOpPw ? "Скрыть" : "Показать"}
+                  </button>
                 </div>
-                {form.operatorMode === "existing" && (
-                  <select value={form.selectedOperatorId}
-                    onChange={e => setForm(p => p && { ...p, selectedOperatorId: e.target.value })}
-                    className="select text-sm w-full">
-                    <option value="">Выберите оператора...</option>
-                    {allOperators.map(op => <option key={op.id} value={op.id}>{op.email}</option>)}
-                  </select>
-                )}
-                {form.operatorMode === "new" && (
-                  <div className="space-y-2">
-                    <input type="email" value={form.newOpEmail}
-                      onChange={e => setForm(p => p && { ...p, newOpEmail: e.target.value })}
-                      className="input text-sm" placeholder="email@operator.ru" autoComplete="new-password" />
-                    <div className="relative">
-                      <input type={form.showNewOpPw ? "text" : "password"} value={form.newOpPassword}
-                        onChange={e => setForm(p => p && { ...p, newOpPassword: e.target.value })}
-                        className="input text-sm pr-16" placeholder="Пароль" autoComplete="new-password" />
-                      <button type="button"
-                        onClick={() => setForm(p => p && { ...p, showNewOpPw: !p.showNewOpPw })}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-neutral-400 hover:text-neutral-600">
-                        {form.showNewOpPw ? "Скрыть" : "Показать"}
-                      </button>
-                    </div>
-                  </div>
-                )}
               </div>
             )}
 
