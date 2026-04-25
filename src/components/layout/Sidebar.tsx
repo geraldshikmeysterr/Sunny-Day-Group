@@ -37,12 +37,12 @@ export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
-  const { isAdmin, cityId, loaded } = useAdmin();
+  const { isAdmin, zoneIds, loaded } = useAdmin() as any;
 
   let role: "superadmin" | "operator" | null = null;
   if (loaded) {
     if (isAdmin) role = "superadmin";
-    else if (cityId) role = "operator";
+    else if (zoneIds?.length > 0) role = "operator";
   }
 
   useEffect(() => {
