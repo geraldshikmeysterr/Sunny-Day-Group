@@ -21,17 +21,39 @@ const EMPTY: CityFields = { name: "", region: "", phone: "", email: "", telegram
 
 // ---------------------------------------------------------------------------
 // Phone formatter: +7 (XXX) XXX-XX-XX
+// prev is needed to detect deletion of auto-inserted separators (e.g. ")").
 // ---------------------------------------------------------------------------
-function formatPhone(raw: string): string {
-  const digits = raw.replace(/\D/g, "");
-  let d = (digits.startsWith("7") || digits.startsWith("8")) ? digits.slice(1) : digits;
-  d = d.slice(0, 10);
-  if (!d) return "";
-  let r = `+7 (${d.slice(0, Math.min(3, d.length))}`;
-  if (d.length >= 3) r += ")";
-  if (d.length > 3) r += ` ${d.slice(3, 6)}`;
-  if (d.length > 6) r += `-${d.slice(6, 8)}`;
-  if (d.length > 8) r += `-${d.slice(8, 10)}`;
+function formatPhone(raw: string, prev: string): string {
+  const allDigits = raw.replace(/\D/g, "");
+  if (!allDigits) return "";
+
+  // User typed "7" from an empty field → show +7 prefix
+  if (allDigits === "7" && !prev) return "+7";
+
+  // Strip country code prefix
+  let body = (allDigits.startsWith("7") || allDigits.startsWith("8"))
+    ? allDigits.slice(1)
+    : allDigits;
+
+  // Detect deletion of a formatting character:
+  // if body digits are unchanged but the visible string got shorter,
+  // the user deleted a punctuation symbol — so remove the last real digit.
+  const prevDigits = prev.replace(/\D/g, "");
+  const prevBody = (prevDigits.startsWith("7") || prevDigits.startsWith("8"))
+    ? prevDigits.slice(1)
+    : prevDigits;
+  if (body.length === prevBody.length && raw.length < prev.length) {
+    body = body.slice(0, -1);
+  }
+
+  body = body.slice(0, 10);
+  if (!body) return "+7";
+
+  let r = `+7 (${body.slice(0, Math.min(3, body.length))}`;
+  if (body.length >= 3) r += ")";
+  if (body.length > 3) r += ` ${body.slice(3, 6)}`;
+  if (body.length > 6) r += `-${body.slice(6, 8)}`;
+  if (body.length > 8) r += `-${body.slice(8, 10)}`;
   return r;
 }
 
@@ -67,7 +89,7 @@ function CityFormFields({ values, onChange }: {
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"><Phone size={13} /></span>
               <input type="tel" value={values.phone}
-                onChange={e => onChange("phone", formatPhone(e.target.value))}
+                onChange={e => onChange("phone", formatPhone(e.target.value, values.phone))}
                 className="input pl-8 text-sm" placeholder="+7 (999) 000-00-00" />
             </div>
           </div>
