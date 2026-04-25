@@ -42,10 +42,12 @@ export default function RestaurantsPage() {
   }, [isAdmin, opCityIds]);
 
   function openAdd() {
+    setSaving(false);
     setForm({ ...EMPTY, city_id: opCityIds[0] ?? cities[0]?.id ?? "" });
     setModal({ open: true, editing: null });
   }
   function openEdit(r: any) {
+    setSaving(false);
     setForm({
       address: r.address, working_hours: r.working_hours ?? "",
       coords: r.lat != null && r.lng != null ? `${r.lat}, ${r.lng}` : "",
