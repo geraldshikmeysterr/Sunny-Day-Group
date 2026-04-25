@@ -141,14 +141,14 @@ export default function RestaurantsPage() {
               <tr key={`sk-${i}`}>{Array.from({ length: colCount }, (_, j) => j).map(j => <td key={`sk-col-${j}`}><div className="skeleton h-4" /></td>)}</tr>
             ))}
             {!loading && filtered.map(r => (
-              <tr key={r.id}>
+              <tr key={r.id} className="group">
                 {showCityFilter && <td><span className="badge text-xs bg-success-50 text-success-700">{getCityName(r.city_id)}</span></td>}
                 <td className="text-sm text-neutral-700">{r.address}</td>
                 <td className="text-sm text-neutral-500 whitespace-nowrap">{r.working_hours ?? "—"}</td>
                 <td><span className={cn("badge text-xs", r.is_active ? "bg-success-50 text-success-700" : "bg-neutral-100 text-neutral-500")}>{r.is_active ? "Открыт" : "Закрыт"}</span></td>
                 <td>
                   {isAdmin && (
-                    <div className="flex items-center justify-end gap-0.5">
+                    <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button onClick={() => openEdit(r)} className="btn-ghost btn-sm text-brand-500"><Edit2 size={14} /></button>
                       <button onClick={() => toggleRestaurant(r)} className="btn-ghost btn-sm text-neutral-400">
                         {r.is_active ? <EyeOff size={14} /> : <Eye size={14} />}
