@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { CustomSelect, MultiSelect } from "@/components/CustomSelect";
 
-const EMPTY = { address: "", working_hours: "", lat: "", lng: "", is_active: false, city_id: "" };
+const EMPTY = { address: "", working_hours: "", coords: "", is_active: false, city_id: "" };
 
 export default function RestaurantsPage() {
   const { isAdmin, cityIds: opCityIds } = useAdmin() as any;
@@ -48,7 +48,7 @@ export default function RestaurantsPage() {
   function openEdit(r: any) {
     setForm({
       address: r.address, working_hours: r.working_hours ?? "",
-      lat: String(r.lat ?? ""), lng: String(r.lng ?? ""),
+      coords: r.lat != null && r.lng != null ? `${r.lat}, ${r.lng}` : "",
       is_active: r.is_active, city_id: r.city_id,
     });
     setModal({ open: true, editing: r });
@@ -56,11 +56,12 @@ export default function RestaurantsPage() {
 
   async function save() {
     setSaving(true);
+    const [rawLat, rawLng] = form.coords.split(",").map(s => s.trim());
     const payload = {
       address: form.address,
       working_hours: form.working_hours || null,
-      lat: form.lat ? Number.parseFloat(form.lat) : null,
-      lng: form.lng ? Number.parseFloat(form.lng) : null,
+      lat: rawLat ? Number.parseFloat(rawLat) : null,
+      lng: rawLng ? Number.parseFloat(rawLng) : null,
       is_active: form.is_active,
       city_id: form.city_id || opCityIds[0],
     };
@@ -145,15 +146,9 @@ export default function RestaurantsPage() {
                 <label htmlFor="rest-hours" className="label">Часы работы</label>
                 <input id="rest-hours" value={form.working_hours} onChange={e => setForm(p => ({ ...p, working_hours: e.target.value }))} className="input" placeholder="09:00–22:00" autoComplete="off" />
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label htmlFor="rest-lat" className="label">Широта</label>
-                  <input id="rest-lat" type="number" value={form.lat} onChange={e => setForm(p => ({ ...p, lat: e.target.value }))} className="input" placeholder="00.00000" autoComplete="off" />
-                </div>
-                <div>
-                  <label htmlFor="rest-lng" className="label">Долгота</label>
-                  <input id="rest-lng" type="number" value={form.lng} onChange={e => setForm(p => ({ ...p, lng: e.target.value }))} className="input" placeholder="00.00000" autoComplete="off" />
-                </div>
+              <div>
+                <label htmlFor="rest-coords" className="label">Координаты</label>
+                <input id="rest-coords" value={form.coords} onChange={e => setForm(p => ({ ...p, coords: e.target.value }))} className="input" placeholder="00.000000, 00.000000" autoComplete="off" />
               </div>
               <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <input type="checkbox" checked={form.is_active} onChange={e => setForm(p => ({ ...p, is_active: e.target.checked }))} className="w-4 h-4 rounded accent-brand-500" />

@@ -326,7 +326,7 @@ const DeliveryZoneMap = forwardRef<DeliveryZoneMapHandle, Props>(function Delive
       const marker = new globalThis.ymaps.Placemark(
         [r.lat, r.lng],
         { hintContent: r.address, balloonContent: r.address },
-        { preset: "islands#darkBlueIcon", interactivityModel: "default#opaque" }
+        { preset: "islands#circleDotIcon", iconColor: "#C2185B", interactivityModel: "default#opaque" }
       );
       map.geoObjects.add(marker);
       restaurantMarkersRef.current.push(marker);
