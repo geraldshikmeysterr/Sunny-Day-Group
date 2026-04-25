@@ -309,8 +309,8 @@ export default function CitiesPage() {
                     <td>
                       <div className="flex items-center justify-end gap-0.5">
                         <button onClick={() => openEdit(city)} className="btn-ghost btn-sm text-brand-500"><Edit2 size={14}/></button>
-                        <button onClick={() => toggleCity(city.id, city.is_active)} className="btn-ghost btn-sm text-neutral-400">
-                          {city.is_active ? <EyeOff size={14}/> : <Eye size={14}/>}
+                        <button onClick={() => toggleCity(city.id, city.is_active)} className={cn("btn-ghost btn-sm", city.is_active ? "text-success-600" : "text-neutral-400")}>
+                          {city.is_active ? <Eye size={14}/> : <EyeOff size={14}/>}
                         </button>
                         <button onClick={() => deleteCity(city)} disabled={deleting === city.id} className="btn-ghost btn-sm text-danger-500">
                           {deleting === city.id ? <Loader2 size={14} className="animate-spin"/> : <Trash2 size={14}/>}
