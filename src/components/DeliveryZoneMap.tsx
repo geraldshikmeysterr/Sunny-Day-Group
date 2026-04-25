@@ -1,6 +1,6 @@
 "use client";
-import { useEffect, useRef, useState, useCallback } from "react";
-import { MapPin, X, Check, Undo2 } from "lucide-react";
+import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from "react";
+import { MapPin, X, Undo2 } from "lucide-react";
 
 export type ZoneGeoJSON = {
   type: "Polygon";
@@ -170,9 +170,13 @@ function addDraggableMarker(
   hoveredRef.current = dot;
 }
 
-export default function DeliveryZoneMap({
+export type DeliveryZoneMapHandle = {
+  completePolygon: () => ZoneGeoJSON | null;
+};
+
+const DeliveryZoneMap = forwardRef<DeliveryZoneMapHandle, Props>(function DeliveryZoneMap({
   zones, previewGeojson, mode, onPolygonComplete, onDrawCancel, center,
-}: Readonly<Props>) {
+}, ref) {
   const apiKey = process.env.NEXT_PUBLIC_YANDEX_MAPS_KEY ?? "";
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
@@ -203,14 +207,6 @@ export default function DeliveryZoneMap({
     setPointCount(0);
   }, []);
 
-  const completePolygon = useCallback(() => {
-    const d = drawRef.current;
-    if (d.points.length < 3) return;
-    const geojson: ZoneGeoJSON = { type: "Polygon", coordinates: [toGeojson([...d.points, d.points[0]])] };
-    clearDrawing();
-    onPolygonComplete?.(geojson);
-  }, [clearDrawing, onPolygonComplete]);
-
   // Deletes a specific marker, or the last one if none given.
   const deletePoint = useCallback((target?: any) => {
     const map = mapRef.current;
@@ -230,6 +226,17 @@ export default function DeliveryZoneMap({
     clearDrawing();
     onDrawCancel?.();
   }, [clearDrawing, onDrawCancel]);
+
+  useImperativeHandle(ref, () => ({
+    completePolygon: () => {
+      const d = drawRef.current;
+      if (d.points.length < 3) return null;
+      const geojson: ZoneGeoJSON = { type: "Polygon", coordinates: [toGeojson([...d.points, d.points[0]])] };
+      clearDrawing();
+      onPolygonComplete?.(geojson);
+      return geojson;
+    },
+  }), [clearDrawing, onPolygonComplete]);
 
   // Map initialisation (runs once per mount)
   useEffect(() => {
@@ -337,21 +344,12 @@ export default function DeliveryZoneMap({
           <span className="text-neutral-500">
             {pointCount < 3 ? `Кликайте по карте (${pointCount}/3)` : `${pointCount} точек`}
           </span>
-
           {pointCount > 0 && (
             <button onClick={() => deletePoint()} title="Удалить последнюю точку (Backspace)"
               className="flex items-center gap-1 text-neutral-500 hover:text-neutral-700 transition-colors">
               <Undo2 size={12} /> Отмена
             </button>
           )}
-
-          {pointCount >= 3 && (
-            <button onClick={completePolygon}
-              className="flex items-center gap-1 bg-brand-500 hover:bg-brand-600 text-white rounded-full px-3 py-1 font-medium transition-colors">
-              <Check size={12} /> Завершить
-            </button>
-          )}
-
           <button onClick={handleCancel} className="text-neutral-400 hover:text-neutral-600">
             <X size={14} />
           </button>
@@ -359,4 +357,6 @@ export default function DeliveryZoneMap({
       )}
     </div>
   );
-}
+});
+
+export default DeliveryZoneMap;

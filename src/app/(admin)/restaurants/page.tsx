@@ -21,9 +21,11 @@ export default function RestaurantsPage() {
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
 
+  const showCityFilter = isAdmin || opCityIds.length >= 2;
+
   useEffect(() => {
-    if (isAdmin) createClient().from("cities").select("id,name").order("name").then(({data})=>setCities(data??[]));
-  }, [isAdmin]);
+    if (showCityFilter) createClient().from("cities").select("id,name").order("name").then(({data})=>setCities(data??[]));
+  }, [showCityFilter]);
 
   const fetchRestaurants = useCallback(async () => {
     setLoading(true);
@@ -34,6 +36,11 @@ export default function RestaurantsPage() {
   }, [isAdmin, opCityIds]);
 
   useEffect(() => { fetchRestaurants(); }, [fetchRestaurants]);
+
+  // Pre-select all operator cities when filter appears
+  useEffect(() => {
+    if (!isAdmin && opCityIds.length >= 2) setCityFilters(opCityIds);
+  }, [isAdmin, opCityIds]);
 
   function openAdd() { setForm({...EMPTY, city_id: opCityIds[0]??cities[0]?.id??""}); setModal({open:true,editing:null}); }
   function openEdit(r:any) { setForm({name:r.name,address:r.address,phone:r.phone??"",working_hours:r.working_hours??"",lat:String(r.lat??""),lng:String(r.lng??""),is_active:r.is_active,city_id:r.city_id}); setModal({open:true,editing:r}); }
@@ -50,7 +57,7 @@ export default function RestaurantsPage() {
   const getCityName = (id:string) => cities.find(c=>c.id===id)?.name??"—";
   const filtered = restaurants.filter(r => {
     const matchSearch = !search || r.name.toLowerCase().includes(search.toLowerCase()) || r.address.toLowerCase().includes(search.toLowerCase());
-    const matchCity = !isAdmin || cityFilters.length === 0 || cityFilters.includes(r.city_id);
+    const matchCity = !showCityFilter || cityFilters.length === 0 || cityFilters.includes(r.city_id);
     return matchSearch && matchCity;
   });
   const cityOptions = cities.map(c=>({value:c.id,label:c.name}));
@@ -63,17 +70,17 @@ export default function RestaurantsPage() {
       </div>
       <div className="card p-4 flex flex-wrap gap-3 items-center sticky top-4 z-20 bg-white shadow-card">
         <div className="relative flex-1 min-w-52"><Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Поиск по названию или адресу..." className="input pl-8 text-sm" autoComplete="off"/></div>
-        {isAdmin && <MultiSelect values={cityFilters} onChange={setCityFilters} options={cityOptions} className="w-48" placeholder="Все города"/>}
+        {showCityFilter && <MultiSelect values={cityFilters} onChange={setCityFilters} options={cityOptions} className="w-48" placeholder="Все города"/>}
       </div>
       <div className="card overflow-hidden">
         <table className="table">
-          <thead><tr><th>Ресторан</th>{isAdmin&&<th>Город</th>}<th>Адрес</th><th>Телефон</th><th>Часы</th><th>Статус</th><th></th></tr></thead>
+          <thead><tr><th>Ресторан</th>{showCityFilter&&<th>Город</th>}<th>Адрес</th><th>Телефон</th><th>Часы</th><th>Статус</th><th></th></tr></thead>
           <tbody>
             {loading&&Array.from({length:4},(_,i)=>i).map(i=><tr key={`sk-${i}`}>{Array.from({length:isAdmin?7:6},(_,j)=>j).map(j=><td key={`sk-col-${j}`}><div className="skeleton h-4"/></td>)}</tr>)}
             {!loading&&filtered.map(r=>(
               <tr key={r.id}>
                 <td className="font-semibold text-neutral-900">{r.name}</td>
-                {isAdmin&&<td><span className="badge text-xs bg-sun-100 text-brand-700">{getCityName(r.city_id)}</span></td>}
+                {showCityFilter&&<td><span className="badge text-xs bg-sun-100 text-brand-700">{getCityName(r.city_id)}</span></td>}
                 <td className="text-sm text-neutral-500 max-w-xs truncate">{r.address}</td>
                 <td className="text-sm text-neutral-500">{r.phone??"—"}</td>
                 <td className="text-sm text-neutral-500 whitespace-nowrap">{r.working_hours??"—"}</td>
@@ -81,7 +88,7 @@ export default function RestaurantsPage() {
                 {isAdmin && <td><button onClick={()=>openEdit(r)} className="btn-ghost btn-sm text-brand-500"><Edit2 size={14}/></button></td>}
               </tr>
             ))}
-            {!loading&&!filtered.length&&<tr><td colSpan={isAdmin?7:6} className="py-16 text-center text-neutral-400">Нет ресторанов</td></tr>}
+            {!loading&&!filtered.length&&<tr><td colSpan={showCityFilter?7:6} className="py-16 text-center text-neutral-400">Нет ресторанов</td></tr>}
           </tbody>
         </table>
       </div>

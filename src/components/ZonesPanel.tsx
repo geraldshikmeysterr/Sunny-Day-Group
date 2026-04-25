@@ -1,5 +1,5 @@
 "use client";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import {
   DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors,
 } from "@dnd-kit/core";
@@ -15,7 +15,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import DeliveryZoneMap, { type ZoneGeoJSON, type DeliveryZone } from "./DeliveryZoneMap";
+import DeliveryZoneMap, { type ZoneGeoJSON, type DeliveryZone, type DeliveryZoneMapHandle } from "./DeliveryZoneMap";
 import { useEffect } from "react";
 
 export type FullZone = DeliveryZone & {
@@ -121,6 +121,7 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [mapKey, setMapKey] = useState(0);
   const [formError, setFormError] = useState("");
+  const mapRef = useRef<DeliveryZoneMapHandle>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -269,22 +270,30 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
 
   async function saveZone() {
     if (!form) return;
-    const err = validate(form);
+
+    // Auto-finalize polygon if still in draw mode
+    let currentForm = form;
+    if (mapMode === "draw" && !form.geojson) {
+      const geojson = mapRef.current?.completePolygon() ?? null;
+      if (geojson) currentForm = { ...form, geojson };
+    }
+
+    const err = validate(currentForm);
     if (err) { setFormError(err); return; }
     setSaving(true);
     setFormError("");
 
     const base: ZoneBase = {
-      name: form.name.trim(),
-      delivery_fee: Number(form.delivery_fee),
-      min_order: Number(form.min_order),
-      free_from: form.free_from.trim() ? Number(form.free_from) : null,
-      geojson: form.geojson!,
+      name: currentForm.name.trim(),
+      delivery_fee: Number(currentForm.delivery_fee),
+      min_order: Number(currentForm.min_order),
+      free_from: currentForm.free_from.trim() ? Number(currentForm.free_from) : null,
+      geojson: currentForm.geojson!,
       is_active: true,
-      sort_order: form.id ? (zones.find((z) => z.id === form.id)?.sort_order ?? 0) : zones.length,
+      sort_order: currentForm.id ? (zones.find((z) => z.id === currentForm.id)?.sort_order ?? 0) : zones.length,
     };
 
-    const savedForm = { ...form };
+    const savedForm = { ...currentForm };
     try {
       if (isPending) {
         applyPendingZone(base, savedForm.id);
@@ -454,7 +463,7 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
                 </div>
               ) : (
                 <p className="text-xs text-neutral-500 text-center">
-                  {mapMode === "draw" ? "Кликайте по карте, нажмите «Завершить»" : "Нарисуйте зону на карте →"}
+                  Нарисуйте зону на карте →
                 </p>
               )}
             </div>
@@ -499,6 +508,7 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
       {/* Right: map */}
       <div className="flex-1 p-3">
         <DeliveryZoneMap
+          ref={mapRef}
           key={mapKey}
           zones={mapZones}
           previewGeojson={form?.geojson ?? null}

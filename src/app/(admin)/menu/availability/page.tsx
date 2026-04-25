@@ -109,7 +109,8 @@ export default function AvailabilityPage() {
     }
     setMatrix(m);
 
-    if (!isAdmin && opCityIds.length > 0) {
+    // Operator with exactly 1 city: auto-select it; 2+ cities: start empty (use filter)
+    if (!isAdmin && opCityIds.length === 1) {
       setSelectedCities(new Set(opCityIds));
     } else {
       setSelectedCities(new Set());
@@ -218,13 +219,13 @@ export default function AvailabilityPage() {
             className="input pl-8 text-sm" />
         </div>
 
-        {isAdmin && (
+        {(isAdmin || opCityIds.length >= 2) && (
           <FilterDropdown
             label="Города"
-            options={allCities}
+            options={isAdmin ? allCities : allCities.filter(c => opCityIds.includes(c.id))}
             selected={selectedCities}
             onToggle={toggleCityFilter}
-            onSelectAll={() => setSelectedCities(new Set(allCities.map(c => c.id)))}
+            onSelectAll={() => setSelectedCities(new Set(isAdmin ? allCities.map(c => c.id) : opCityIds))}
             onClearAll={() => setSelectedCities(new Set())}
           />
         )}

@@ -12,17 +12,115 @@ type City = {
   telegram: string | null; instagram: string | null; vk: string | null; max_messenger: string | null;
 };
 
-const EMPTY_ADD  = { city_name: "", city_region: "", city_phone: "", city_email: "", city_telegram: "", city_instagram: "", city_vk: "", city_max: "" };
-const EMPTY_EDIT = { name: "", region: "", phone: "", email: "", telegram: "", instagram: "", vk: "", max: "" };
+type CityFields = {
+  name: string; region: string; phone: string; email: string;
+  telegram: string; instagram: string; vk: string; max: string;
+};
 
+const EMPTY: CityFields = { name: "", region: "", phone: "", email: "", telegram: "", instagram: "", vk: "", max: "" };
+
+// ---------------------------------------------------------------------------
+// Phone formatter: +7 (XXX) XXX-XX-XX
+// ---------------------------------------------------------------------------
+function formatPhone(raw: string): string {
+  const digits = raw.replace(/\D/g, "");
+  let d = (digits.startsWith("7") || digits.startsWith("8")) ? digits.slice(1) : digits;
+  d = d.slice(0, 10);
+  if (!d) return "";
+  let r = `+7 (${d.slice(0, Math.min(3, d.length))}`;
+  if (d.length >= 3) r += ")";
+  if (d.length > 3) r += ` ${d.slice(3, 6)}`;
+  if (d.length > 6) r += `-${d.slice(6, 8)}`;
+  if (d.length > 8) r += `-${d.slice(8, 10)}`;
+  return r;
+}
+
+// ---------------------------------------------------------------------------
+// CityFormFields — MUST be defined outside CitiesPage to avoid remount on re-render
+// ---------------------------------------------------------------------------
+function CityFormFields({ values, onChange }: {
+  values: CityFields;
+  onChange: (field: keyof CityFields, value: string) => void;
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="space-y-3">
+        <div>
+          <label className="label">Название города *</label>
+          <input value={values.name}
+            onChange={e => onChange("name", e.target.value)}
+            className="input" placeholder="Новосибирск" />
+        </div>
+        <div>
+          <label className="label">Регион</label>
+          <input value={values.region}
+            onChange={e => onChange("region", e.target.value)}
+            className="input" placeholder="Необязательно" />
+        </div>
+      </div>
+
+      <div className="border-t border-neutral-200 pt-4">
+        <p className="text-sm font-semibold text-neutral-700 mb-3">Контакты города</p>
+        <div className="space-y-2">
+          <div>
+            <label className="label">Номер телефона</label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"><Phone size={13} /></span>
+              <input type="tel" value={values.phone}
+                onChange={e => onChange("phone", formatPhone(e.target.value))}
+                className="input pl-8 text-sm" placeholder="+7 (999) 000-00-00" />
+            </div>
+          </div>
+          <div>
+            <label className="label">Электронная почта</label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"><Mail size={13} /></span>
+              <input type="email" value={values.email}
+                onChange={e => onChange("email", e.target.value)}
+                className="input pl-8 text-sm" placeholder="city@operator.ru" />
+            </div>
+          </div>
+          <div>
+            <label className="label">Telegram</label>
+            <input value={values.telegram}
+              onChange={e => onChange("telegram", e.target.value)}
+              className="input text-sm" placeholder="@solnechniy_den" />
+          </div>
+          <div>
+            <label className="label">Instagram</label>
+            <input value={values.instagram}
+              onChange={e => onChange("instagram", e.target.value)}
+              className="input text-sm" placeholder="@solnechniy_den" />
+          </div>
+          <div>
+            <label className="label">ВКонтакте</label>
+            <input value={values.vk}
+              onChange={e => onChange("vk", e.target.value)}
+              className="input text-sm" placeholder="https://vk.com/…" />
+          </div>
+          <div>
+            <label className="label">Max</label>
+            <input value={values.max}
+              onChange={e => onChange("max", e.target.value)}
+              className="input text-sm" placeholder="@solnechniy_den" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// CitiesPage
+// ---------------------------------------------------------------------------
 export default function CitiesPage() {
   const supabase = createClient();
   const [cities,       setCities]       = useState<City[]>([]);
   const [loading,      setLoading]      = useState(true);
   const [addModal,     setAddModal]     = useState(false);
   const [editModal,    setEditModal]    = useState<City | null>(null);
-  const [addForm,      setAddForm]      = useState(EMPTY_ADD);
-  const [editForm,     setEditForm]     = useState(EMPTY_EDIT);
+  const [addForm,      setAddForm]      = useState<CityFields>(EMPTY);
+  const [editForm,     setEditForm]     = useState<CityFields>(EMPTY);
   const [saving,       setSaving]       = useState(false);
   const [deleting,     setDeleting]     = useState<string | null>(null);
   const [error,        setError]        = useState("");
@@ -37,22 +135,29 @@ export default function CitiesPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  function patchAdd(field: keyof CityFields, value: string) {
+    setAddForm(p => ({ ...p, [field]: value }));
+  }
+  function patchEdit(field: keyof CityFields, value: string) {
+    setEditForm(p => ({ ...p, [field]: value }));
+  }
+
   async function createCity() {
-    if (!addForm.city_name) { setError("Введите название города"); return; }
+    if (!addForm.name) { setError("Введите название города"); return; }
     setSaving(true); setError("");
     try {
       const { data: newCity, error: cityError } = await supabase
-        .from("cities").insert({ name: addForm.city_name, region: addForm.city_region || null })
+        .from("cities").insert({ name: addForm.name, region: addForm.region || null })
         .select().single();
       if (cityError) throw new Error(cityError.message);
 
       const socials: any = {};
-      if (addForm.city_phone)     socials.phone         = addForm.city_phone;
-      if (addForm.city_email)     socials.email         = addForm.city_email;
-      if (addForm.city_telegram)  socials.telegram      = addForm.city_telegram;
-      if (addForm.city_instagram) socials.instagram     = addForm.city_instagram;
-      if (addForm.city_vk)        socials.vk            = addForm.city_vk;
-      if (addForm.city_max)       socials.max_messenger = addForm.city_max;
+      if (addForm.phone)     socials.phone         = addForm.phone;
+      if (addForm.email)     socials.email         = addForm.email;
+      if (addForm.telegram)  socials.telegram      = addForm.telegram;
+      if (addForm.instagram) socials.instagram     = addForm.instagram;
+      if (addForm.vk)        socials.vk            = addForm.vk;
+      if (addForm.max)       socials.max_messenger = addForm.max;
       if (Object.keys(socials).length > 0) {
         await supabase.from("cities").update(socials).eq("id", newCity.id);
       }
@@ -78,7 +183,7 @@ export default function CitiesPage() {
       }
 
       toast.success(`Город «${newCity.name}» создан`);
-      setAddModal(false); setAddForm(EMPTY_ADD); setPendingZones([]); await fetchData();
+      setAddModal(false); setAddForm(EMPTY); setPendingZones([]); await fetchData();
     } catch (e: any) { setError(e.message); }
     setSaving(false);
   }
@@ -94,7 +199,7 @@ export default function CitiesPage() {
         vk: editForm.vk || null, max_messenger: editForm.max || null,
       }).eq("id", editModal.id);
       toast.success("Город сохранён");
-      setEditModal(null); setEditForm(EMPTY_EDIT); await fetchData();
+      setEditModal(null); setEditForm(EMPTY); await fetchData();
     } catch (e: any) { toast.error(e.message); }
     setSaving(false);
   }
@@ -117,67 +222,12 @@ export default function CitiesPage() {
   }
 
   function openEdit(city: City) {
-    setEditForm({ name: city.name, region: city.region ?? "", phone: city.phone ?? "", email: city.email ?? "", telegram: city.telegram ?? "", instagram: city.instagram ?? "", vk: city.vk ?? "", max: city.max_messenger ?? "" });
+    setEditForm({
+      name: city.name, region: city.region ?? "", phone: city.phone ?? "",
+      email: city.email ?? "", telegram: city.telegram ?? "", instagram: city.instagram ?? "",
+      vk: city.vk ?? "", max: city.max_messenger ?? "",
+    });
     setEditModal(city); setError("");
-  }
-
-  // ------------------------------------------------------------------
-  // Shared form section component
-  // ------------------------------------------------------------------
-
-  function CityFormFields({ prefix, form, setForm }: {
-    prefix: "add" | "edit";
-    form: typeof addForm | typeof editForm;
-    setForm: (v: any) => void;
-  }) {
-    const f = form as any;
-    const isAdd = prefix === "add";
-    return (
-      <div className="space-y-4">
-        <div className="grid grid-cols-2 gap-3">
-          <div className="col-span-2">
-            <label className="label">Название города *</label>
-            <input value={isAdd ? f.city_name : f.name}
-              onChange={e => setForm((p: any) => ({ ...p, [isAdd ? "city_name" : "name"]: e.target.value }))}
-              className="input" placeholder="Новосибирск" />
-          </div>
-          <div className="col-span-2">
-            <label className="label">Регион</label>
-            <input value={isAdd ? f.city_region : f.region}
-              onChange={e => setForm((p: any) => ({ ...p, [isAdd ? "city_region" : "region"]: e.target.value }))}
-              className="input" placeholder="Необязательно" />
-          </div>
-        </div>
-
-        <div className="border-t border-neutral-200 pt-4">
-          <p className="text-sm font-semibold text-neutral-700 mb-3">Контакты города</p>
-          <div className="space-y-2">
-            {([
-              { key: isAdd ? "city_phone" : "phone",         icon: <Phone size={13} />,  ph: "+7 (999) 000-00-00",  label: "Номер телефона" },
-              { key: isAdd ? "city_email" : "email",         icon: <Mail size={13} />,   ph: "city@operator.ru",    label: "Электронная почта", type: "email" },
-              { key: isAdd ? "city_telegram" : "telegram",   icon: null,                 ph: "@solnechniy_den",     label: "Telegram" },
-              { key: isAdd ? "city_instagram" : "instagram", icon: null,                 ph: "@solnechniy_den",     label: "Instagram" },
-              { key: isAdd ? "city_vk" : "vk",               icon: null,                 ph: "https://vk.com/…",    label: "ВКонтакте" },
-              { key: isAdd ? "city_max" : "max",             icon: null,                 ph: "@solnechniy_den",     label: "Max" },
-            ] as any[]).map(({ key, icon, ph, type, label }) => (
-              <div key={key}>
-                <label className="label">{label}</label>
-                {icon ? (
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400">{icon}</span>
-                    <input type={type ?? "text"} value={f[key] ?? ""} onChange={e => setForm((p: any) => ({ ...p, [key]: e.target.value }))}
-                      className="input pl-8 text-sm" placeholder={ph} />
-                  </div>
-                ) : (
-                  <input type={type ?? "text"} value={f[key] ?? ""} onChange={e => setForm((p: any) => ({ ...p, [key]: e.target.value }))}
-                    className="input text-sm" placeholder={ph} />
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
   }
 
   // ------------------------------------------------------------------
@@ -191,7 +241,7 @@ export default function CitiesPage() {
           <h1 className="text-3xl font-bold text-neutral-900">Города</h1>
           <p className="text-sm text-neutral-500 mt-0.5">{cities.length} городов</p>
         </div>
-        <button onClick={() => { setAddModal(true); setError(""); setAddForm(EMPTY_ADD); setPendingZones([]); }} className="btn-primary btn-md">
+        <button onClick={() => { setAddModal(true); setError(""); setAddForm(EMPTY); setPendingZones([]); }} className="btn-primary btn-md">
           <Plus size={16} /> Новый город
         </button>
       </div>
@@ -252,9 +302,7 @@ export default function CitiesPage() {
         </div>
       )}
 
-      {/* ------------------------------------------------------------------ */}
-      {/* Add modal                                                           */}
-      {/* ------------------------------------------------------------------ */}
+      {/* Add modal */}
       {addModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
           <div className="bg-white rounded-2xl shadow-card-lg w-full max-w-[1280px] h-[88vh] flex flex-col animate-scale-in overflow-hidden">
@@ -262,11 +310,10 @@ export default function CitiesPage() {
               <h2 className="text-xl font-semibold">Новый город</h2>
               <button onClick={() => setAddModal(false)} className="btn-ghost btn-sm"><X size={16}/></button>
             </div>
-
             <div className="flex flex-1 min-h-0">
               <div className="w-80 flex-shrink-0 border-r border-neutral-200 flex flex-col">
                 <div className="overflow-y-auto flex-1 p-6">
-                  <CityFormFields prefix="add" form={addForm} setForm={setAddForm} />
+                  <CityFormFields values={addForm} onChange={patchAdd} />
                 </div>
                 {error && <p className="text-sm text-danger-600 bg-danger-50 mx-6 mb-2 px-3 py-2 rounded-lg">{error}</p>}
                 <div className="flex justify-end gap-2 px-6 py-4 border-t border-neutral-200 flex-shrink-0">
@@ -276,7 +323,6 @@ export default function CitiesPage() {
                   </button>
                 </div>
               </div>
-
               <div className="flex-1 flex flex-col min-h-0">
                 <div className="px-4 py-3 border-b border-neutral-100 flex-shrink-0">
                   <p className="text-sm font-semibold text-neutral-700">Зоны доставки</p>
@@ -291,9 +337,7 @@ export default function CitiesPage() {
         </div>
       )}
 
-      {/* ------------------------------------------------------------------ */}
-      {/* Edit modal                                                          */}
-      {/* ------------------------------------------------------------------ */}
+      {/* Edit modal */}
       {editModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
           <div className="bg-white rounded-2xl shadow-card-lg w-full max-w-[1280px] h-[88vh] flex flex-col animate-scale-in overflow-hidden">
@@ -301,11 +345,10 @@ export default function CitiesPage() {
               <h2 className="text-xl font-semibold">Редактировать город</h2>
               <button onClick={() => setEditModal(null)} className="btn-ghost btn-sm"><X size={16}/></button>
             </div>
-
             <div className="flex flex-1 min-h-0">
               <div className="w-80 flex-shrink-0 border-r border-neutral-200 flex flex-col">
                 <div className="overflow-y-auto flex-1 p-6">
-                  <CityFormFields prefix="edit" form={editForm} setForm={setEditForm} />
+                  <CityFormFields values={editForm} onChange={patchEdit} />
                 </div>
                 <div className="flex justify-end gap-2 px-6 py-4 border-t border-neutral-200 flex-shrink-0">
                   <button onClick={() => setEditModal(null)} className="btn-secondary btn-md">Отмена</button>
@@ -314,7 +357,6 @@ export default function CitiesPage() {
                   </button>
                 </div>
               </div>
-
               <div className="flex-1 flex flex-col min-h-0">
                 <div className="px-4 py-3 border-b border-neutral-100 flex-shrink-0">
                   <p className="text-sm font-semibold text-neutral-700">Зоны доставки</p>
