@@ -322,11 +322,19 @@ const DeliveryZoneMap = forwardRef<DeliveryZoneMapHandle, Props>(function Delive
     restaurantMarkersRef.current.forEach((m) => map.geoObjects.remove(m));
     restaurantMarkersRef.current = [];
 
+    const RestaurantLayout = globalThis.ymaps.templateLayoutFactory.createClass(
+      '<div style="width:22px;height:22px;background:#C2185B;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,0.35);font-size:12px;line-height:1;user-select:none">🍴</div>'
+    );
     (restaurants ?? []).forEach((r) => {
       const marker = new globalThis.ymaps.Placemark(
         [r.lat, r.lng],
         { hintContent: r.address, balloonContent: r.address },
-        { preset: "islands#circleDotIcon", iconColor: "#C2185B", interactivityModel: "default#opaque" }
+        {
+          iconLayout: RestaurantLayout,
+          iconShape: { type: "Circle", coordinates: [0, 0], radius: 11 },
+          iconImageOffset: [-11, -11],
+          interactivityModel: "default#opaque",
+        }
       );
       map.geoObjects.add(marker);
       restaurantMarkersRef.current.push(marker);

@@ -127,7 +127,7 @@ export default function RestaurantsPage() {
             ))}
             {!loading && filtered.map(r => (
               <tr key={r.id}>
-                {showCityFilter && <td><span className="badge text-xs bg-sun-100 text-brand-700">{getCityName(r.city_id)}</span></td>}
+                {showCityFilter && <td><span className="badge text-xs bg-success-50 text-success-700">{getCityName(r.city_id)}</span></td>}
                 <td className="text-sm text-neutral-700">{r.address}</td>
                 <td className="text-sm text-neutral-500 whitespace-nowrap">{r.working_hours ?? "—"}</td>
                 <td><span className={cn("badge text-xs", r.is_active ? "bg-success-50 text-success-700" : "bg-neutral-100 text-neutral-500")}>{r.is_active ? "Открыт" : "Закрыт"}</span></td>
