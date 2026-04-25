@@ -15,12 +15,6 @@ CREATE TABLE IF NOT EXISTS public.operator_zones (
   PRIMARY KEY (operator_id, zone_id)
 );
 
--- Audit trigger
-DROP TRIGGER IF EXISTS audit_operator_zones ON public.operator_zones;
-CREATE TRIGGER audit_operator_zones
-  AFTER INSERT OR UPDATE OR DELETE ON public.operator_zones
-  FOR EACH ROW EXECUTE FUNCTION audit_trigger_fn();
-
 -- ----------------------------------------------------------------
 -- 2. RLS
 -- ----------------------------------------------------------------
