@@ -391,7 +391,7 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
   return (
     <div className="flex h-full min-h-0">
       {/* Left: zone list or form */}
-      <div className="w-56 flex-shrink-0 border-r border-neutral-200 flex flex-col">
+      <div className="w-80 flex-shrink-0 border-r border-neutral-200 flex flex-col">
         {form === null ? (
           <>
             <div className="p-3 border-b border-neutral-100">

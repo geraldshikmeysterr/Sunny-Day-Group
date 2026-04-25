@@ -151,19 +151,20 @@ export default function CitiesPage() {
 
         <div className="border-t border-neutral-200 pt-4">
           <p className="text-sm font-semibold text-neutral-700 mb-3">Контакты города</p>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-2">
             {([
-              { key: isAdd ? "city_phone" : "phone",       icon: <Phone size={13} />,         ph: "+7 (999) 000-00-00" },
-              { key: isAdd ? "city_email" : "email",       icon: <Mail size={13} />,          ph: "city@operator.ru", type: "email" },
-              { key: isAdd ? "city_telegram" : "telegram", icon: null,                        ph: "@solnechniy_den",  label: "Telegram" },
-              { key: isAdd ? "city_instagram" : "instagram", icon: null,                      ph: "@solnechniy_den",  label: "Instagram" },
-              { key: isAdd ? "city_vk" : "vk",             icon: null,                        ph: "https://vk.com/…", label: "ВКонтакте" },
-              { key: isAdd ? "city_max" : "max",           icon: null,                        ph: "@solnechniy_den",  label: "Max" },
+              { key: isAdd ? "city_phone" : "phone",         icon: <Phone size={13} />,         ph: "+7 (999) 000-00-00" },
+              { key: isAdd ? "city_email" : "email",         icon: <Mail size={13} />,          ph: "city@operator.ru", type: "email" },
+              { key: isAdd ? "city_telegram" : "telegram",   icon: null,                        ph: "@solnechniy_den",  label: "Telegram" },
+              { key: isAdd ? "city_instagram" : "instagram", icon: null,                        ph: "@solnechniy_den",  label: "Instagram" },
+              { key: isAdd ? "city_vk" : "vk",               icon: null,                        ph: "https://vk.com/…", label: "ВКонтакте" },
+              { key: isAdd ? "city_max" : "max",             icon: null,                        ph: "@solnechniy_den",  label: "Max" },
             ] as any[]).map(({ key, icon, ph, type, label }) => (
               <div key={key}>
                 {label && <label className="label">{label}</label>}
                 {icon ? (
-                  <div className="relative">{icon && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400">{icon}</span>}
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400">{icon}</span>
                     <input type={type ?? "text"} value={f[key] ?? ""} onChange={e => setForm((p: any) => ({ ...p, [key]: e.target.value }))}
                       className="input pl-8 text-sm" placeholder={ph} />
                   </div>
