@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useAdmin } from "@/components/layout/AdminContext";
-import { Plus, Edit2, X, Loader2, Search } from "lucide-react";
+import { Plus, Edit2, X, Loader2, Search, Eye, EyeOff, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { CustomSelect, MultiSelect } from "@/components/CustomSelect";
@@ -22,6 +22,7 @@ export default function RestaurantsPage() {
   const [modal, setModal] = useState<{ open: boolean; editing: any | null }>({ open: false, editing: null });
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   const showCityFilter = isAdmin || opCityIds.length >= 2;
 
@@ -56,6 +57,20 @@ export default function RestaurantsPage() {
       is_active: r.is_active, city_id: r.city_id,
     });
     setModal({ open: true, editing: r });
+  }
+
+  async function toggleRestaurant(r: any) {
+    await supabase.from("restaurants").update({ is_active: !r.is_active }).eq("id", r.id);
+    setRestaurants(p => p.map(x => x.id === r.id ? { ...x, is_active: !r.is_active } : x));
+  }
+
+  async function deleteRestaurant(r: any) {
+    if (!confirm(`Удалить ресторан «${r.address}»?`)) return;
+    setDeleting(r.id);
+    const { error } = await supabase.from("restaurants").delete().eq("id", r.id);
+    if (error) { toast.error(error.message); }
+    else { setRestaurants(p => p.filter(x => x.id !== r.id)); toast.success("Ресторан удалён"); }
+    setDeleting(null);
   }
 
   async function save() {
@@ -132,7 +147,17 @@ export default function RestaurantsPage() {
                 <td className="text-sm text-neutral-500 whitespace-nowrap">{r.working_hours ?? "—"}</td>
                 <td><span className={cn("badge text-xs", r.is_active ? "bg-success-50 text-success-700" : "bg-neutral-100 text-neutral-500")}>{r.is_active ? "Открыт" : "Закрыт"}</span></td>
                 <td>
-                  {isAdmin && <button onClick={() => openEdit(r)} className="btn-ghost btn-sm text-brand-500"><Edit2 size={14} /></button>}
+                  {isAdmin && (
+                    <div className="flex items-center justify-end gap-0.5">
+                      <button onClick={() => openEdit(r)} className="btn-ghost btn-sm text-brand-500"><Edit2 size={14} /></button>
+                      <button onClick={() => toggleRestaurant(r)} className="btn-ghost btn-sm text-neutral-400">
+                        {r.is_active ? <EyeOff size={14} /> : <Eye size={14} />}
+                      </button>
+                      <button onClick={() => deleteRestaurant(r)} disabled={deleting === r.id} className="btn-ghost btn-sm text-danger-500">
+                        {deleting === r.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                      </button>
+                    </div>
+                  )}
                 </td>
               </tr>
             ))}
