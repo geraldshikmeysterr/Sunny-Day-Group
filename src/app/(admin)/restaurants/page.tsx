@@ -150,8 +150,8 @@ export default function RestaurantsPage() {
                   {isAdmin && (
                     <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button onClick={() => openEdit(r)} className="btn-ghost btn-sm text-brand-500"><Edit2 size={14} /></button>
-                      <button onClick={() => toggleRestaurant(r)} className="btn-ghost btn-sm text-neutral-400">
-                        {r.is_active ? <EyeOff size={14} /> : <Eye size={14} />}
+                      <button onClick={() => toggleRestaurant(r)} className={cn("btn-ghost btn-sm", r.is_active ? "text-success-600" : "text-neutral-400")}>
+                        {r.is_active ? <Eye size={14} /> : <EyeOff size={14} />}
                       </button>
                       <button onClick={() => deleteRestaurant(r)} disabled={deleting === r.id} className="btn-ghost btn-sm text-danger-500">
                         {deleting === r.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
