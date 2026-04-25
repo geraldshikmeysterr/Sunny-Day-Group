@@ -2,29 +2,52 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
-type AdminCtx = { isAdmin: boolean; cityId: string | null; loaded: boolean };
-const Ctx = createContext<AdminCtx>({ isAdmin: false, cityId: null, loaded: false });
+type AdminCtx = {
+  isAdmin:  boolean;
+  zoneIds:  string[];
+  cityIds:  string[];
+  loaded:   boolean;
+};
+
+const Ctx = createContext<AdminCtx>({ isAdmin: false, zoneIds: [], cityIds: [], loaded: false });
 
 export function AdminProvider({ children }: Readonly<{ children: React.ReactNode }>) {
-  const [ctx, setCtx] = useState<AdminCtx>({ isAdmin: false, cityId: null, loaded: false });
+  const [ctx, setCtx] = useState<AdminCtx>({ isAdmin: false, zoneIds: [], cityIds: [], loaded: false });
 
   useEffect(() => {
     const supabase = createClient();
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!session?.user) {
-        setCtx({ isAdmin: false, cityId: null, loaded: true });
+        setCtx({ isAdmin: false, zoneIds: [], cityIds: [], loaded: true });
         return;
       }
       const userId = session.user.id;
+
       const { data: admin } = await supabase
         .from("admins").select("id").eq("id", userId).maybeSingle();
       if (admin) {
-        setCtx({ isAdmin: true, cityId: null, loaded: true });
+        setCtx({ isAdmin: true, zoneIds: [], cityIds: [], loaded: true });
         return;
       }
+
       const { data: op } = await supabase
-        .from("operators").select("city_id").eq("id", userId).maybeSingle();
-      setCtx({ isAdmin: false, cityId: op?.city_id ?? null, loaded: true });
+        .from("operators").select("id").eq("id", userId).maybeSingle();
+      if (!op) {
+        setCtx({ isAdmin: false, zoneIds: [], cityIds: [], loaded: true });
+        return;
+      }
+
+      const { data: opZones } = await supabase
+        .from("operator_zones")
+        .select("zone_id, delivery_zones(city_id)")
+        .eq("operator_id", userId);
+
+      const zoneIds = opZones?.map((z: any) => z.zone_id) ?? [];
+      const cityIds = [...new Set(
+        opZones?.map((z: any) => z.delivery_zones?.city_id).filter(Boolean) ?? []
+      )] as string[];
+
+      setCtx({ isAdmin: false, zoneIds, cityIds, loaded: true });
     });
     return () => subscription.unsubscribe();
   }, []);

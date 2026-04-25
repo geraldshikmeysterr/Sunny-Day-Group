@@ -11,7 +11,8 @@ type City = {
   phone: string | null; email: string | null;
   telegram: string | null; instagram: string | null; vk: string | null; max_messenger: string | null;
 };
-type Operator = { id: string; city_id: string; email: string | null; is_active: boolean };
+type Operator = { id: string; city_id: string | null; email: string | null; is_active: boolean };
+type ZoneOption = { id: string; name: string };
 
 const EMPTY_ADD  = { city_name: "", city_region: "", city_phone: "", city_email: "", city_telegram: "", city_instagram: "", city_vk: "", city_max: "", operator_email: "", operator_password: "", showPw: false };
 const EMPTY_EDIT = { name: "", region: "", phone: "", email: "", telegram: "", instagram: "", vk: "", max: "", op_email: "", op_password: "", showPw: false };
@@ -48,6 +49,9 @@ export default function CitiesPage() {
   const [error,        setError]        = useState("");
   // Zones collected while creating a new city (no city_id yet)
   const [pendingZones, setPendingZones] = useState<FullZone[]>([]);
+  // Zone assignment for the edit modal
+  const [cityZones,    setCityZones]    = useState<ZoneOption[]>([]);
+  const [editOpZones,  setEditOpZones]  = useState<string[]>([]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -117,8 +121,9 @@ export default function CitiesPage() {
         } catch { /* menu items are non-critical */ }
 
         // Save any delivery zones drawn during city creation
+        let savedZoneIds: string[] = [];
         if (pendingZones.length > 0) {
-          await supabase.from("delivery_zones").insert(
+          const { data: savedZones } = await supabase.from("delivery_zones").insert(
             pendingZones.map((z, i) => ({
               city_id:      result.city.id,
               name:         z.name,
@@ -129,7 +134,18 @@ export default function CitiesPage() {
               is_active:    z.is_active,
               sort_order:   i,
             }))
-          );
+          ).select("id");
+          savedZoneIds = savedZones?.map((z: any) => z.id) ?? [];
+        }
+
+        // Auto-assign all new zones to the operator
+        if (savedZoneIds.length > 0) {
+          const { data: newOp } = await supabase.from("operators").select("id").eq("city_id", result.city.id).maybeSingle();
+          if (newOp) {
+            await supabase.from("operator_zones").insert(
+              savedZoneIds.map(zid => ({ operator_id: newOp.id, zone_id: zid }))
+            );
+          }
         }
       }
 
@@ -149,6 +165,8 @@ export default function CitiesPage() {
         telegram: editForm.telegram || null, instagram: editForm.instagram || null,
         vk: editForm.vk || null, max_messenger: editForm.max || null,
       }).eq("id", editModal.id);
+
+      let opId: string | null = operators[editModal.id]?.id ?? null;
 
       if (editForm.op_email && editForm.op_password) {
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editForm.op_email)) {
@@ -171,8 +189,20 @@ export default function CitiesPage() {
             operator_password: editForm.op_password,
             existing_city_id: editModal.id,
           }, token);
+          const { data: newOp } = await supabase.from("operators").select("id").eq("city_id", editModal.id).maybeSingle();
+          opId = newOp?.id ?? null;
           toast.success("Оператор сменён");
         } catch (e: any) { toast.error(e.message ?? "Ошибка создания оператора"); }
+      }
+
+      // Update zone assignments for this operator
+      if (opId) {
+        await supabase.from("operator_zones").delete().eq("operator_id", opId);
+        if (editOpZones.length > 0) {
+          await supabase.from("operator_zones").insert(
+            editOpZones.map(zid => ({ operator_id: opId!, zone_id: zid }))
+          );
+        }
       }
 
       toast.success("Город сохранён");
@@ -207,6 +237,14 @@ export default function CitiesPage() {
   function openEdit(city: City) {
     setEditForm({ name: city.name, region: city.region ?? "", phone: city.phone ?? "", email: city.email ?? "", telegram: city.telegram ?? "", instagram: city.instagram ?? "", vk: city.vk ?? "", max: city.max_messenger ?? "", op_email: "", op_password: "", showPw: false });
     setEditModal(city); setError("");
+    setCityZones([]); setEditOpZones([]);
+    supabase.from("delivery_zones").select("id,name").eq("city_id", city.id).order("sort_order")
+      .then(({ data }) => setCityZones(data ?? []));
+    const op = operators[city.id];
+    if (op) {
+      supabase.from("operator_zones").select("zone_id").eq("operator_id", op.id)
+        .then(({ data }) => setEditOpZones(data?.map((z: any) => z.zone_id) ?? []));
+    }
   }
 
   // ------------------------------------------------------------------
@@ -263,6 +301,31 @@ export default function CitiesPage() {
             ))}
           </div>
         </div>
+
+        {!isAdd && (
+          <div className="border-t border-neutral-200 pt-4">
+            <p className="text-sm font-semibold text-neutral-700 mb-3">Зоны оператора</p>
+            {cityZones.length === 0 ? (
+              <p className="text-xs text-neutral-400">Нет зон доставки</p>
+            ) : (
+              <div className="space-y-2">
+                {cityZones.map(zone => (
+                  <label key={zone.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={editOpZones.includes(zone.id)}
+                      onChange={() => setEditOpZones(prev =>
+                        prev.includes(zone.id) ? prev.filter(id => id !== zone.id) : [...prev, zone.id]
+                      )}
+                      className="w-4 h-4 rounded accent-brand-500"
+                    />
+                    {zone.name}
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="border-t border-neutral-200 pt-4">
           <p className="text-sm font-semibold text-neutral-700 mb-1">

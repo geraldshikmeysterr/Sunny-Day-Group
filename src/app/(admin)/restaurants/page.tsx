@@ -10,7 +10,7 @@ import { CustomSelect, MultiSelect } from "@/components/CustomSelect";
 const EMPTY = { name:"", address:"", phone:"", working_hours:"", lat:"", lng:"", is_active:true, city_id:"" };
 
 export default function RestaurantsPage() {
-  const { isAdmin, cityId: opCityId } = useAdmin() as any;
+  const { isAdmin, cityIds: opCityIds } = useAdmin() as any;
   const supabase = createClient();
   const [restaurants, setRestaurants] = useState<any[]>([]);
   const [cities, setCities] = useState<any[]>([]);
@@ -28,19 +28,19 @@ export default function RestaurantsPage() {
   const fetchRestaurants = useCallback(async () => {
     setLoading(true);
     let q = supabase.from("restaurants").select("*").order("name");
-    if (!isAdmin && opCityId) q = q.eq("city_id", opCityId);
+    if (!isAdmin && opCityIds.length > 0) q = q.in("city_id", opCityIds);
     const { data } = await q;
     setRestaurants(data??[]); setLoading(false);
-  }, [isAdmin, opCityId]);
+  }, [isAdmin, opCityIds]);
 
   useEffect(() => { fetchRestaurants(); }, [fetchRestaurants]);
 
-  function openAdd() { setForm({...EMPTY, city_id: opCityId??cities[0]?.id??""}); setModal({open:true,editing:null}); }
+  function openAdd() { setForm({...EMPTY, city_id: opCityIds[0]??cities[0]?.id??""}); setModal({open:true,editing:null}); }
   function openEdit(r:any) { setForm({name:r.name,address:r.address,phone:r.phone??"",working_hours:r.working_hours??"",lat:String(r.lat??""),lng:String(r.lng??""),is_active:r.is_active,city_id:r.city_id}); setModal({open:true,editing:r}); }
 
   async function save() {
     setSaving(true);
-    const payload = {name:form.name,address:form.address,phone:form.phone||null,working_hours:form.working_hours||null,lat:form.lat?Number.parseFloat(form.lat):null,lng:form.lng?Number.parseFloat(form.lng):null,is_active:form.is_active,city_id:form.city_id||opCityId};
+    const payload = {name:form.name,address:form.address,phone:form.phone||null,working_hours:form.working_hours||null,lat:form.lat?Number.parseFloat(form.lat):null,lng:form.lng?Number.parseFloat(form.lng):null,is_active:form.is_active,city_id:form.city_id||opCityIds[0]};
     if (modal.editing) await supabase.from("restaurants").update(payload).eq("id",modal.editing.id);
     else await supabase.from("restaurants").insert(payload);
     toast.success(modal.editing?"Ресторан обновлён":"Ресторан добавлен");

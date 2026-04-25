@@ -56,7 +56,7 @@ const getTypeName = (name: string) =>
   name === "Мороженое / Замороженные" ? "Замороженная продукция" : name;
 
 export default function AvailabilityPage() {
-  const { isAdmin, cityId: opCityId, loaded } = useAdmin() as any;
+  const { isAdmin, cityIds: opCityIds, loaded } = useAdmin() as any;
   const supabase = createClient();
 
   const [allCities,   setAllCities]   = useState<City[]>([]);
@@ -109,14 +109,14 @@ export default function AvailabilityPage() {
     }
     setMatrix(m);
 
-    if (!isAdmin && opCityId) {
-      setSelectedCities(new Set([opCityId]));
+    if (!isAdmin && opCityIds.length > 0) {
+      setSelectedCities(new Set(opCityIds));
     } else {
       setSelectedCities(new Set());
     }
 
     setLoading(false);
-  }, [loaded, isAdmin, opCityId]);
+  }, [loaded, isAdmin, opCityIds]);
 
   useEffect(() => { load(); }, [load]);
 

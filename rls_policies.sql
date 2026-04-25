@@ -4,7 +4,7 @@
 -- =============================================================================
 -- Role model:
 --   admins    → full access to everything
---   operators → city-scoped; linked via operators.city_id = auth.uid()
+--   operators → zone-scoped; linked via operator_zones table
 -- =============================================================================
 
 -- Helper: is the current user an admin?
@@ -13,7 +13,24 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER AS $$
   SELECT EXISTS (SELECT 1 FROM admins WHERE id = auth.uid())
 $$;
 
--- Helper: return the city_id for the current operator (NULL if admin or unauthenticated)
+-- Helper: delivery zone IDs the current operator owns (empty array if admin/unauthenticated)
+CREATE OR REPLACE FUNCTION operator_zone_ids()
+RETURNS uuid[] LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT COALESCE(array_agg(zone_id), '{}')
+  FROM   operator_zones
+  WHERE  operator_id = auth.uid()
+$$;
+
+-- Helper: city IDs derived from the operator's zones
+CREATE OR REPLACE FUNCTION operator_city_ids()
+RETURNS uuid[] LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT COALESCE(array_agg(DISTINCT dz.city_id), '{}')
+  FROM   operator_zones  oz
+  JOIN   delivery_zones  dz ON dz.id = oz.zone_id
+  WHERE  oz.operator_id = auth.uid()
+$$;
+
+-- Deprecated: returns operators.city_id — kept until drop_operator_city_id.sql is applied
 CREATE OR REPLACE FUNCTION operator_city_id()
 RETURNS uuid LANGUAGE sql STABLE SECURITY DEFINER AS $$
   SELECT city_id FROM operators WHERE id = auth.uid() LIMIT 1
@@ -28,21 +45,21 @@ ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "orders_select" ON orders;
 CREATE POLICY "orders_select" ON orders FOR SELECT USING (
   is_admin()
-  OR city_id = operator_city_id()
+  OR delivery_zone_id = ANY(operator_zone_ids())
 );
 
 DROP POLICY IF EXISTS "orders_update" ON orders;
 CREATE POLICY "orders_update" ON orders FOR UPDATE USING (
   is_admin()
-  OR city_id = operator_city_id()
+  OR delivery_zone_id = ANY(operator_zone_ids())
 );
 
--- Inserts come from the mobile app (service role or anon with RLS policy)
--- Adjust INSERT policy based on your mobile app auth model
+-- Mobile app creates orders via create_order() RPC (SECURITY DEFINER).
+-- This INSERT policy covers direct inserts by admin panel only.
 DROP POLICY IF EXISTS "orders_insert" ON orders;
 CREATE POLICY "orders_insert" ON orders FOR INSERT WITH CHECK (
   is_admin()
-  OR city_id = operator_city_id()
+  OR delivery_zone_id = ANY(operator_zone_ids())
 );
 
 DROP POLICY IF EXISTS "orders_delete" ON orders;
@@ -60,11 +77,9 @@ ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "profiles_select" ON profiles;
 CREATE POLICY "profiles_select" ON profiles FOR SELECT USING (
   is_admin()
-  -- Operators can see profiles of users who have orders in their city
   OR id IN (
-    SELECT DISTINCT user_id FROM orders WHERE city_id = operator_city_id()
+    SELECT DISTINCT user_id FROM orders WHERE delivery_zone_id = ANY(operator_zone_ids())
   )
-  -- Users can always read their own profile
   OR id = auth.uid()
 );
 
@@ -83,7 +98,7 @@ ALTER TABLE cities ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "cities_select" ON cities;
 CREATE POLICY "cities_select" ON cities FOR SELECT USING (
   is_admin()
-  OR id = operator_city_id()
+  OR id = ANY(operator_city_ids())
 );
 
 DROP POLICY IF EXISTS "cities_all_admin" ON cities;
@@ -132,7 +147,7 @@ ALTER TABLE menu_items ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "menu_items_select" ON menu_items;
 CREATE POLICY "menu_items_select" ON menu_items FOR SELECT USING (
-  is_admin() OR operator_city_id() IS NOT NULL
+  is_admin() OR cardinality(operator_zone_ids()) > 0
 );
 
 DROP POLICY IF EXISTS "menu_items_write_admin" ON menu_items;
@@ -148,7 +163,7 @@ ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "categories_select" ON categories;
 CREATE POLICY "categories_select" ON categories FOR SELECT USING (
-  is_admin() OR operator_city_id() IS NOT NULL
+  is_admin() OR cardinality(operator_zone_ids()) > 0
 );
 
 DROP POLICY IF EXISTS "categories_write_admin" ON categories;
@@ -181,22 +196,22 @@ ALTER TABLE city_menu_items ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "city_menu_items_select" ON city_menu_items;
 CREATE POLICY "city_menu_items_select" ON city_menu_items FOR SELECT USING (
   is_admin()
-  OR city_id = operator_city_id()
+  OR city_id = ANY(operator_city_ids())
 );
 
 DROP POLICY IF EXISTS "city_menu_items_update" ON city_menu_items;
 CREATE POLICY "city_menu_items_update" ON city_menu_items FOR UPDATE USING (
   is_admin()
-  OR city_id = operator_city_id()
+  OR city_id = ANY(operator_city_ids())
 ) WITH CHECK (
   is_admin()
-  OR city_id = operator_city_id()
+  OR city_id = ANY(operator_city_ids())
 );
 
 DROP POLICY IF EXISTS "city_menu_items_insert" ON city_menu_items;
 CREATE POLICY "city_menu_items_insert" ON city_menu_items FOR INSERT WITH CHECK (
   is_admin()
-  OR city_id = operator_city_id()
+  OR city_id = ANY(operator_city_ids())
 );
 
 DROP POLICY IF EXISTS "city_menu_items_delete" ON city_menu_items;
@@ -214,17 +229,17 @@ ALTER TABLE restaurants ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "restaurants_select" ON restaurants;
 CREATE POLICY "restaurants_select" ON restaurants FOR SELECT USING (
   is_admin()
-  OR city_id = operator_city_id()
+  OR city_id = ANY(operator_city_ids())
 );
 
 DROP POLICY IF EXISTS "restaurants_write" ON restaurants;
 CREATE POLICY "restaurants_write" ON restaurants
-  FOR INSERT WITH CHECK (is_admin() OR city_id = operator_city_id());
+  FOR INSERT WITH CHECK (is_admin() OR city_id = ANY(operator_city_ids()));
 
 DROP POLICY IF EXISTS "restaurants_update" ON restaurants;
 CREATE POLICY "restaurants_update" ON restaurants FOR UPDATE USING (
-  is_admin() OR city_id = operator_city_id()
-) WITH CHECK (is_admin() OR city_id = operator_city_id());
+  is_admin() OR city_id = ANY(operator_city_ids())
+) WITH CHECK (is_admin() OR city_id = ANY(operator_city_ids()));
 
 DROP POLICY IF EXISTS "restaurants_delete" ON restaurants;
 CREATE POLICY "restaurants_delete" ON restaurants FOR DELETE USING (is_admin());
@@ -273,7 +288,9 @@ ALTER TABLE order_items ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "order_items_select" ON order_items;
 CREATE POLICY "order_items_select" ON order_items FOR SELECT USING (
   is_admin()
-  OR order_id IN (SELECT id FROM orders WHERE city_id = operator_city_id())
+  OR order_id IN (
+    SELECT id FROM orders WHERE delivery_zone_id = ANY(operator_zone_ids())
+  )
 );
 
 
@@ -287,9 +304,8 @@ DROP POLICY IF EXISTS "addresses_select" ON addresses;
 CREATE POLICY "addresses_select" ON addresses FOR SELECT USING (
   is_admin()
   OR user_id = auth.uid()
-  -- Operators see addresses linked to their city's orders
   OR user_id IN (
-    SELECT DISTINCT user_id FROM orders WHERE city_id = operator_city_id()
+    SELECT DISTINCT user_id FROM orders WHERE delivery_zone_id = ANY(operator_zone_ids())
   )
 );
 
@@ -409,12 +425,12 @@ DROP POLICY IF EXISTS "delivery_zones_write_admin" ON delivery_zones;
 CREATE POLICY "delivery_zones_write_admin" ON delivery_zones
   FOR ALL USING (is_admin()) WITH CHECK (is_admin());
 
--- Operators: SELECT only, city-scoped (includes inactive zones — needed for admin panel)
+-- Operators: SELECT only, their own zones (includes inactive — needed for admin panel)
 DROP POLICY IF EXISTS "delivery_zones_select" ON delivery_zones;
 CREATE POLICY "delivery_zones_select" ON delivery_zones
   FOR SELECT USING (
     is_admin()
-    OR city_id = operator_city_id()
+    OR id = ANY(operator_zone_ids())
   );
 
 -- Public / mobile app: active zones only (no auth required — anon GRANT already exists)
@@ -428,6 +444,32 @@ CREATE POLICY "delivery_zones: public read active" ON delivery_zones
 --   GRANT SELECT ON delivery_zones TO anon;
 --   GRANT ALL ON delivery_zones TO authenticated;
 --   GRANT ALL ON delivery_zones TO service_role;
+
+
+-- =============================================================================
+-- TABLE: operator_zones
+-- Maps operators to the specific delivery zones they manage.
+-- Replaces the old operators.city_id approach.
+-- Structure: operator_id uuid FK→operators, zone_id uuid FK→delivery_zones
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS public.operator_zones (
+  operator_id uuid NOT NULL REFERENCES public.operators(id)      ON DELETE CASCADE,
+  zone_id     uuid NOT NULL REFERENCES public.delivery_zones(id) ON DELETE CASCADE,
+  PRIMARY KEY (operator_id, zone_id)
+);
+
+ALTER TABLE public.operator_zones ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "operator_zones_admin" ON public.operator_zones;
+CREATE POLICY "operator_zones_admin" ON public.operator_zones
+  FOR ALL USING (is_admin()) WITH CHECK (is_admin());
+
+DROP POLICY IF EXISTS "operator_zones_self" ON public.operator_zones;
+CREATE POLICY "operator_zones_self" ON public.operator_zones
+  FOR SELECT USING (operator_id = auth.uid());
+
+GRANT SELECT ON public.operator_zones TO authenticated;
+GRANT ALL    ON public.operator_zones TO service_role;
 
 
 -- =============================================================================

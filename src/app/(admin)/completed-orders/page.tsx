@@ -11,7 +11,7 @@ import type { OrderStatus } from "@/lib/utils";
 const PAGE_SIZE = 25;
 
 export default function CompletedOrdersPage() {
-  const { isAdmin, cityId } = useAdmin() as any;
+  const { isAdmin, zoneIds } = useAdmin() as any;
   const supabase = createClient();
   const [orders, setOrders] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
@@ -34,14 +34,14 @@ export default function CompletedOrdersPage() {
         .in("status", ["delivered","cancelled"])
         .range(page*PAGE_SIZE,(page+1)*PAGE_SIZE-1)
         .order("created_at",{ascending:false});
-      if (!isAdmin && cityId) q = q.eq("city_id", cityId);
+      if (!isAdmin && zoneIds.length > 0) q = q.in("delivery_zone_id", zoneIds);
       else if (isAdmin && cityFilter !== "all") q = q.eq("city_id", cityFilter);
       if (statusFilter !== "all") q = q.eq("status", statusFilter);
       const { data, count } = await q;
       setOrders(data??[]); setTotal(count??0);
     } catch { toast.error("Ошибка загрузки"); }
     finally { setLoading(false); }
-  }, [page, statusFilter, cityFilter, isAdmin, cityId]);
+  }, [page, statusFilter, cityFilter, isAdmin, zoneIds]);
 
   useEffect(() => { fetchOrders(); }, [fetchOrders]);
 
