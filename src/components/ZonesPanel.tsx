@@ -517,8 +517,8 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
         )}
       </div>
 
-      {/* Right: map */}
-      <div className="flex-1 p-3">
+      {/* Right: map — aspect-square keeps it square regardless of modal dimensions */}
+      <div className="aspect-square flex-shrink-0 p-3">
         <DeliveryZoneMap
           ref={mapRef}
           key={mapKey}

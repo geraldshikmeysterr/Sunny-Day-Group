@@ -338,7 +338,7 @@ export default function CitiesPage() {
       {/* Add modal */}
       {addModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-card-lg w-full max-w-[1280px] h-[88vh] flex flex-col animate-scale-in overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-card-lg w-full max-w-[calc(88vh+520px)] h-[88vh] flex flex-col animate-scale-in overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-200 flex-shrink-0">
               <h2 className="text-xl font-semibold">Новый город</h2>
               <button onClick={() => setAddModal(false)} className="btn-ghost btn-sm"><X size={16}/></button>
@@ -373,7 +373,7 @@ export default function CitiesPage() {
       {/* Edit modal */}
       {editModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-card-lg w-full max-w-[1280px] h-[88vh] flex flex-col animate-scale-in overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-card-lg w-full max-w-[calc(88vh+520px)] h-[88vh] flex flex-col animate-scale-in overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-200 flex-shrink-0">
               <h2 className="text-xl font-semibold">Редактировать город</h2>
               <button onClick={() => setEditModal(null)} className="btn-ghost btn-sm"><X size={16}/></button>

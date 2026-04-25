@@ -104,7 +104,7 @@ export default function RestaurantsPage() {
   }
 
   const getCityName = (id: string) => cities.find(c => c.id === id)?.name ?? "—";
-  const colCount = showCityFilter ? 7 : 6;
+  const colCount = showCityFilter ? 5 : 4;
   const filtered = restaurants.filter(r => {
     const matchSearch = !search || r.address.toLowerCase().includes(search.toLowerCase());
     const matchCity = !showCityFilter || cityFilters.length === 0 || cityFilters.includes(r.city_id);
@@ -130,8 +130,7 @@ export default function RestaurantsPage() {
           <thead>
             <tr>
               {showCityFilter && <th>Город</th>}
-              <th>Адрес</th>
-              <th className="w-full"></th>
+              <th className="w-full">Адрес</th>
               <th>Часы работы</th>
               <th>Статус</th>
               <th></th>
@@ -145,7 +144,6 @@ export default function RestaurantsPage() {
               <tr key={r.id} className="group">
                 {showCityFilter && <td className="text-sm text-neutral-700 whitespace-nowrap">{getCityName(r.city_id)}</td>}
                 <td className="text-sm text-neutral-700">{r.address}</td>
-                <td></td>
                 <td className="text-sm text-neutral-500 whitespace-nowrap">{r.working_hours ?? "—"}</td>
                 <td><span className={cn("badge text-xs", r.is_active ? "bg-success-50 text-success-700" : "bg-neutral-100 text-neutral-500")}>{r.is_active ? "Открыт" : "Закрыт"}</span></td>
                 <td>
