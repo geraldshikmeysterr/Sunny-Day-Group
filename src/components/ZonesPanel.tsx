@@ -76,7 +76,7 @@ function ZoneRow({ zone, onEdit, onToggle, onDelete, deleting }: Readonly<{
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={cn(
-        "flex items-center gap-2 px-3 py-2.5 rounded-lg border border-neutral-200 bg-white",
+        "group flex items-center gap-2 px-3 py-2.5 rounded-lg border border-neutral-200 bg-white",
         isDragging && "shadow-lg opacity-80 z-10",
         !zone.is_active && "opacity-60"
       )}
@@ -92,10 +92,10 @@ function ZoneRow({ zone, onEdit, onToggle, onDelete, deleting }: Readonly<{
           {zone.free_from != null && ` · бесплатно от ${zone.free_from} ₽`}
         </p>
       </div>
-      <div className="flex items-center gap-0.5 flex-shrink-0">
+      <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
         <button onClick={() => onEdit(zone)} className="btn-ghost btn-sm text-brand-500 px-1.5"><Edit2 size={13} /></button>
-        <button onClick={() => onToggle(zone)} className="btn-ghost btn-sm text-neutral-400 px-1.5">
-          {zone.is_active ? <EyeOff size={13} /> : <Eye size={13} />}
+        <button onClick={() => onToggle(zone)} className={cn("btn-ghost btn-sm px-1.5", zone.is_active ? "text-success-600" : "text-neutral-400")}>
+          {zone.is_active ? <Eye size={13} /> : <EyeOff size={13} />}
         </button>
         <button onClick={() => onDelete(zone)} disabled={deleting} className="btn-ghost btn-sm text-danger-500 px-1.5">
           {deleting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
@@ -470,7 +470,7 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
                     Зона нарисована
                   </span>
                   <button onClick={() => setMapMode("draw")} className="btn-ghost btn-sm text-xs px-2 flex-shrink-0">
-                    <PenLine size={12} /> Перерисовать
+                    <Edit2 size={12} /> Редактировать
                   </button>
                 </div>
               ) : (
@@ -524,7 +524,8 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
           key={mapKey}
           zones={mapZones}
           restaurants={restaurants}
-          previewGeojson={form?.geojson ?? null}
+          previewGeojson={mapMode === "draw" ? null : (form?.geojson ?? null)}
+          initialGeojson={form?.geojson ?? null}
           mode={mapMode}
           onPolygonComplete={handlePolygonComplete}
           onDrawCancel={() => setMapMode(form?.geojson ? "view" : "draw")}

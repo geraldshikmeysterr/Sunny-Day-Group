@@ -26,6 +26,7 @@ type Props = {
   zones: DeliveryZone[];
   restaurants?: RestaurantMarker[];
   previewGeojson?: ZoneGeoJSON | null;
+  initialGeojson?: ZoneGeoJSON | null;
   mode: "view" | "draw";
   onPolygonComplete?: (geojson: ZoneGeoJSON) => void;
   onDrawCancel?: () => void;
@@ -183,7 +184,7 @@ export type DeliveryZoneMapHandle = {
 };
 
 const DeliveryZoneMap = forwardRef<DeliveryZoneMapHandle, Props>(function DeliveryZoneMap({
-  zones, restaurants, previewGeojson, mode, onPolygonComplete, onDrawCancel, center,
+  zones, restaurants, previewGeojson, initialGeojson, mode, onPolygonComplete, onDrawCancel, center,
 }, ref) {
   const apiKey = process.env.NEXT_PUBLIC_YANDEX_MAPS_KEY ?? "";
   const containerRef = useRef<HTMLDivElement>(null);
@@ -194,6 +195,7 @@ const DeliveryZoneMap = forwardRef<DeliveryZoneMapHandle, Props>(function Delive
   const hoveredMarkerRef = useRef<any>(null);
   const modeRef = useRef(mode);
   modeRef.current = mode;
+  const prevModeRef = useRef(mode);
   const [pointCount, setPointCount] = useState(0);
   const [mapReady, setMapReady] = useState(false);
 
@@ -231,6 +233,29 @@ const DeliveryZoneMap = forwardRef<DeliveryZoneMapHandle, Props>(function Delive
       updateDrawPreview(globalThis.ymaps, map, d);
     }
   }, []);
+
+  // When mode transitions to "draw" and initialGeojson is provided, load the existing
+  // polygon vertices as draggable markers so the user edits rather than redraws from scratch.
+  useEffect(() => {
+    const prev = prevModeRef.current;
+    prevModeRef.current = mode;
+    if (mode !== "draw" || prev === "draw") return;
+    if (!initialGeojson) return;
+    const map = mapRef.current;
+    const ymaps = globalThis.ymaps;
+    if (!map || !ymaps || !mapReady) return;
+
+    clearDrawing();
+    const pts = toYmaps(initialGeojson.coordinates[0].slice(0, -1));
+    const d = drawRef.current;
+    pts.forEach((coords, i) => {
+      d.points.push(coords);
+      addDraggableMarker(ymaps, map, coords, d, hoveredMarkerRef, i, deletePoint);
+    });
+    setPointCount(d.points.length);
+    updateDrawPreview(ymaps, map, d);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, mapReady]);
 
   const handleCancel = useCallback(() => {
     clearDrawing();
