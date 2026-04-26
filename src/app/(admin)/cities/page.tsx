@@ -6,18 +6,27 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import ZonesPanel, { type FullZone } from "@/components/ZonesPanel";
 
+type MenuType = { id: string; slug: string; name: string };
+
+type CityMenuType = { menu_type_id: string; is_available: boolean };
+
 type City = {
   id: string; name: string; is_active: boolean;
   phone: string | null; email: string | null;
   telegram: string | null; instagram: string | null; vk: string | null; max_messenger: string | null;
+  city_menu_types: CityMenuType[];
 };
 
 type CityFields = {
   name: string; phone: string; email: string;
   telegram: string; instagram: string; vk: string; max: string;
+  menuTypeAvailability: Record<string, boolean>;
 };
 
-const EMPTY: CityFields = { name: "", phone: "", email: "", telegram: "", instagram: "", vk: "", max: "" };
+const EMPTY: CityFields = {
+  name: "", phone: "", email: "", telegram: "", instagram: "", vk: "", max: "",
+  menuTypeAvailability: {},
+};
 
 // ---------------------------------------------------------------------------
 // Phone formatter: +7 (XXX) XXX-XX-XX
@@ -27,17 +36,12 @@ function formatPhone(raw: string, prev: string): string {
   const allDigits = raw.replace(/\D/g, "");
   if (!allDigits) return "";
 
-  // User typed "7" from an empty field → show +7 prefix
   if (allDigits === "7" && !prev) return "+7";
 
-  // Strip country code prefix
   let body = (allDigits.startsWith("7") || allDigits.startsWith("8"))
     ? allDigits.slice(1)
     : allDigits;
 
-  // Detect deletion of a formatting character:
-  // if body digits are unchanged but the visible string got shorter,
-  // the user deleted a punctuation symbol — so remove the last real digit.
   const prevDigits = prev.replace(/\D/g, "");
   const prevBody = (prevDigits.startsWith("7") || prevDigits.startsWith("8"))
     ? prevDigits.slice(1)
@@ -60,9 +64,10 @@ function formatPhone(raw: string, prev: string): string {
 // ---------------------------------------------------------------------------
 // CityFormFields — MUST be defined outside CitiesPage to avoid remount on re-render
 // ---------------------------------------------------------------------------
-function CityFormFields({ values, onChange }: {
+function CityFormFields({ values, onChange, menuTypes }: {
   values: CityFields;
-  onChange: (field: keyof CityFields, value: string) => void;
+  onChange: (field: keyof CityFields, value: string | Record<string, boolean>) => void;
+  menuTypes: MenuType[];
 }) {
   return (
     <div className="space-y-4">
@@ -83,7 +88,7 @@ function CityFormFields({ values, onChange }: {
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"><Phone size={13} /></span>
               <input type="tel" value={values.phone}
-                onChange={e => onChange("phone", formatPhone(e.target.value, values.phone))}
+                onChange={e => onChange("phone", formatPhone(e.target.value, values.phone as string))}
                 className="input pl-8 text-sm" placeholder="+7 (999) 000-00-00" />
             </div>
           </div>
@@ -122,6 +127,28 @@ function CityFormFields({ values, onChange }: {
           </div>
         </div>
       </div>
+
+      {menuTypes.length > 0 && (
+        <div className="border-t border-neutral-200 pt-4">
+          <p className="text-sm font-semibold text-neutral-700 mb-3">Типы меню</p>
+          <div className="space-y-2">
+            {menuTypes.map(mt => (
+              <label key={mt.id} className="flex items-center gap-2.5 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={values.menuTypeAvailability[mt.id] ?? true}
+                  onChange={e => onChange("menuTypeAvailability", {
+                    ...values.menuTypeAvailability,
+                    [mt.id]: e.target.checked,
+                  })}
+                  className="w-4 h-4 rounded accent-brand-500"
+                />
+                <span className="text-neutral-700">{mt.name}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -132,6 +159,7 @@ function CityFormFields({ values, onChange }: {
 export default function CitiesPage() {
   const supabase = createClient();
   const [cities,       setCities]       = useState<City[]>([]);
+  const [menuTypes,    setMenuTypes]    = useState<MenuType[]>([]);
   const [search,       setSearch]       = useState("");
   const [loading,      setLoading]      = useState(true);
   const [addModal,     setAddModal]     = useState(false);
@@ -145,18 +173,35 @@ export default function CitiesPage() {
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    const { data: c } = await supabase.from("cities").select("*").order("name");
-    setCities(c ?? []);
+    const { data: c } = await supabase
+      .from("cities")
+      .select("*, city_menu_types(menu_type_id, is_available)")
+      .order("name");
+    setCities((c as City[]) ?? []);
     setLoading(false);
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  function patchAdd(field: keyof CityFields, value: string) {
+  useEffect(() => {
+    supabase.from("menu_types").select("id, slug, name").then(({ data }) => {
+      setMenuTypes(data ?? []);
+    });
+  }, []);
+
+  function patchAdd(field: keyof CityFields, value: string | Record<string, boolean>) {
     setAddForm(p => ({ ...p, [field]: value }));
   }
-  function patchEdit(field: keyof CityFields, value: string) {
+  function patchEdit(field: keyof CityFields, value: string | Record<string, boolean>) {
     setEditForm(p => ({ ...p, [field]: value }));
+  }
+
+  function openAddModal() {
+    const availability = Object.fromEntries(menuTypes.map(mt => [mt.id, true]));
+    setAddForm({ ...EMPTY, menuTypeAvailability: availability });
+    setAddModal(true);
+    setError("");
+    setPendingZones([]);
   }
 
   async function createCity() {
@@ -177,6 +222,14 @@ export default function CitiesPage() {
       if (addForm.max)       socials.max_messenger = addForm.max;
       if (Object.keys(socials).length > 0) {
         await supabase.from("cities").update(socials).eq("id", newCity.id);
+      }
+
+      // Seed city_menu_types
+      const menuTypeRows = Object.entries(addForm.menuTypeAvailability).map(([menu_type_id, is_available]) => ({
+        city_id: newCity.id, menu_type_id, is_available,
+      }));
+      if (menuTypeRows.length > 0) {
+        await supabase.from("city_menu_types").upsert(menuTypeRows, { onConflict: "city_id,menu_type_id" });
       }
 
       try {
@@ -216,6 +269,14 @@ export default function CitiesPage() {
         vk: editForm.vk || null, max_messenger: editForm.max || null,
       }).eq("id", editModal.id);
       if (error) { toast.error(error.message); setSaving(false); return; }
+
+      const menuTypeRows = Object.entries(editForm.menuTypeAvailability).map(([menu_type_id, is_available]) => ({
+        city_id: editModal.id, menu_type_id, is_available,
+      }));
+      if (menuTypeRows.length > 0) {
+        await supabase.from("city_menu_types").upsert(menuTypeRows, { onConflict: "city_id,menu_type_id" });
+      }
+
       toast.success("Город сохранён");
       setEditModal(null); setEditForm(EMPTY); await fetchData();
     } catch (e: any) { toast.error(e.message); }
@@ -247,16 +308,28 @@ export default function CitiesPage() {
   }
 
   function openEdit(city: City) {
+    const availability: Record<string, boolean> = {};
+    for (const cmt of city.city_menu_types ?? []) {
+      availability[cmt.menu_type_id] = cmt.is_available;
+    }
+    // Default any missing types to true
+    for (const mt of menuTypes) {
+      if (!(mt.id in availability)) availability[mt.id] = true;
+    }
     setEditForm({
       name: city.name, phone: city.phone ?? "",
       email: city.email ?? "", telegram: city.telegram ?? "", instagram: city.instagram ?? "",
       vk: city.vk ?? "", max: city.max_messenger ?? "",
+      menuTypeAvailability: availability,
     });
     setEditModal(city); setError("");
   }
 
   function closeEditModal() {
     if (editModal) {
+      const origAvailability = Object.fromEntries(
+        (editModal.city_menu_types ?? []).map(cmt => [cmt.menu_type_id, cmt.is_available])
+      );
       const changed =
         editForm.name !== editModal.name ||
         editForm.phone !== (editModal.phone ?? "") ||
@@ -264,7 +337,10 @@ export default function CitiesPage() {
         editForm.telegram !== (editModal.telegram ?? "") ||
         editForm.instagram !== (editModal.instagram ?? "") ||
         editForm.vk !== (editModal.vk ?? "") ||
-        editForm.max !== (editModal.max_messenger ?? "");
+        editForm.max !== (editModal.max_messenger ?? "") ||
+        Object.entries(editForm.menuTypeAvailability).some(
+          ([id, val]) => (origAvailability[id] ?? true) !== val
+        );
       if (changed && !confirm("Есть несохранённые изменения. Закрыть без сохранения?")) return;
     }
     setEditModal(null);
@@ -282,7 +358,7 @@ export default function CitiesPage() {
           <h1 className="text-3xl font-bold text-neutral-900">Города</h1>
           <p className="text-sm text-neutral-500 mt-0.5">{cities.length} городов</p>
         </div>
-        <button onClick={() => { setAddModal(true); setError(""); setAddForm(EMPTY); setPendingZones([]); }} className="btn-primary btn-md">
+        <button onClick={openAddModal} className="btn-primary btn-md">
           <Plus size={16} /> Новый город
         </button>
       </div>
@@ -302,7 +378,7 @@ export default function CitiesPage() {
         <div className="card overflow-hidden">
           <table className="table">
             <thead>
-              <tr><th>Город</th><th>Контакты</th><th className="w-full"></th><th>Статус</th><th></th></tr>
+              <tr><th>Город</th><th>Контакты</th><th className="w-full">Типы меню</th><th>Статус</th><th></th></tr>
             </thead>
             <tbody>
               {cities.filter(c => !search || c.name.toLowerCase().includes(search.toLowerCase())).map(city => {
@@ -324,7 +400,21 @@ export default function CitiesPage() {
                         </div>
                       ) : <span className="text-neutral-300 text-xs">—</span>}
                     </td>
-                    <td></td>
+                    <td>
+                      <div className="flex flex-wrap gap-1">
+                        {menuTypes.map(mt => {
+                          const isAvail = city.city_menu_types?.find(cmt => cmt.menu_type_id === mt.id)?.is_available ?? true;
+                          return (
+                            <span key={mt.id} className={cn(
+                              "badge text-xs",
+                              isAvail ? "bg-success-50 text-success-700" : "bg-neutral-100 text-neutral-400 line-through"
+                            )}>
+                              {mt.slug === "frozen" ? "Заморозка" : "Готовые блюда"}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </td>
                     <td className="whitespace-nowrap">
                       <span className={cn("badge text-xs", city.is_active ? "bg-success-50 text-success-700" : "bg-neutral-100 text-neutral-500")}>
                         {city.is_active ? "Активен" : "Скрыт"}
@@ -361,7 +451,7 @@ export default function CitiesPage() {
             <div className="flex flex-1 min-h-0">
               <div className="w-80 flex-shrink-0 border-r border-neutral-200 flex flex-col">
                 <div className="overflow-y-auto flex-1 p-6">
-                  <CityFormFields values={addForm} onChange={patchAdd} />
+                  <CityFormFields values={addForm} onChange={patchAdd} menuTypes={menuTypes} />
                 </div>
                 {error && <p className="text-sm text-danger-600 bg-danger-50 mx-6 mb-2 px-3 py-2 rounded-lg">{error}</p>}
                 <div className="flex justify-end gap-2 px-6 py-4 border-t border-neutral-200 flex-shrink-0">
@@ -396,7 +486,7 @@ export default function CitiesPage() {
             <div className="flex flex-1 min-h-0">
               <div className="w-80 flex-shrink-0 border-r border-neutral-200 flex flex-col">
                 <div className="overflow-y-auto flex-1 p-6">
-                  <CityFormFields values={editForm} onChange={patchEdit} />
+                  <CityFormFields values={editForm} onChange={patchEdit} menuTypes={menuTypes} />
                 </div>
                 <div className="flex justify-end gap-2 px-6 py-4 border-t border-neutral-200 flex-shrink-0">
                   <button onClick={closeEditModal} className="btn-secondary btn-md">Отмена</button>
