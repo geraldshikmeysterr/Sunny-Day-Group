@@ -6,7 +6,7 @@ import { Check, X, Edit3, Loader2, ChevronDown, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
-type City     = { id: string; name: string };
+type City     = { id: string; name: string; city_menu_types?: { menu_type_id: string; is_available: boolean }[] };
 type MenuType = { id: string; slug: string; name: string };
 type Category = { id: string; name: string; menu_type_id: string; sort_order: number };
 type Item     = { id: string; name: string; category_id: string; menu_type_id: string; weight_grams: number | null };
@@ -76,7 +76,7 @@ export default function AvailabilityPage() {
     if (!loaded) return;
     setLoading(true);
     const [cityRes, typeRes, catRes, itemRes, cmi0, cmi1, cmi2, cmi3] = await Promise.all([
-      supabase.from("cities").select("id,name").order("name"),
+      supabase.from("cities").select("id,name,city_menu_types(menu_type_id,is_available)").order("name"),
       supabase.from("menu_types").select("*"),
       supabase.from("categories").select("id,name,menu_type_id,sort_order").eq("is_active", true).order("sort_order"),
       supabase.from("menu_items").select("id,name,category_id,weight_grams,categories(menu_type_id)").eq("is_global_active", true).order("sort_order"),
@@ -161,7 +161,11 @@ export default function AvailabilityPage() {
     finally { setSaving(null); setEditing(null); }
   }
 
-  const visibleCities = allCities.filter(c => selectedCities.has(c.id));
+  const citiesForType = allCities.filter(c => {
+    const cmt = c.city_menu_types?.find(t => t.menu_type_id === activeType);
+    return cmt ? cmt.is_available : true;
+  });
+  const visibleCities = citiesForType.filter(c => selectedCities.has(c.id));
 
   const typeItems = items.filter(i => i.menu_type_id === activeType);
   const visibleCats = categories.filter(c => c.menu_type_id === activeType);
@@ -222,10 +226,10 @@ export default function AvailabilityPage() {
         {(isAdmin || opCityIds.length >= 2) && (
           <FilterDropdown
             label="Города"
-            options={isAdmin ? allCities : allCities.filter(c => opCityIds.includes(c.id))}
+            options={isAdmin ? citiesForType : citiesForType.filter(c => opCityIds.includes(c.id))}
             selected={selectedCities}
             onToggle={toggleCityFilter}
-            onSelectAll={() => setSelectedCities(new Set(isAdmin ? allCities.map(c => c.id) : opCityIds))}
+            onSelectAll={() => setSelectedCities(new Set(isAdmin ? citiesForType.map(c => c.id) : opCityIds.filter((id: string) => citiesForType.some(c => c.id === id))))}
             onClearAll={() => setSelectedCities(new Set())}
           />
         )}

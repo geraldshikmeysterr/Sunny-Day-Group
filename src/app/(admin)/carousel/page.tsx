@@ -451,7 +451,7 @@ export default function CarouselPage() {
 
               <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <input type="checkbox" checked={isActive} onChange={e => setIsActive(e.target.checked)} className="w-4 h-4 rounded accent-brand-500" />
-                Показывать в карусели
+                Активна
               </label>
             </div>
 

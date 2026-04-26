@@ -155,7 +155,7 @@ export default function RestaurantsPage() {
                 {showCityFilter && <td className="text-sm text-neutral-700 whitespace-nowrap">{getCityName(r.city_id)}</td>}
                 <td className="text-sm text-neutral-700">{r.address}</td>
                 <td className="text-sm text-neutral-500 whitespace-nowrap">{r.working_hours ?? "—"}</td>
-                <td><span className={cn("badge text-xs", r.is_active ? "bg-success-50 text-success-700" : "bg-neutral-100 text-neutral-500")}>{r.is_active ? "Открыт" : "Закрыт"}</span></td>
+                <td><span className={cn("badge text-xs", r.is_active ? "bg-success-50 text-success-700" : "bg-neutral-100 text-neutral-500")}>{r.is_active ? "Активен" : "Скрыт"}</span></td>
                 <td>
                   {isAdmin && (
                     <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -204,7 +204,7 @@ export default function RestaurantsPage() {
               </div>
               <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <input type="checkbox" checked={form.is_active} onChange={e => setForm(p => ({ ...p, is_active: e.target.checked }))} className="w-4 h-4 rounded accent-brand-500" />
-                Открыт
+                Активен
               </label>
             </div>
             <div className="flex justify-end gap-2 px-6 py-4 border-t border-neutral-200">

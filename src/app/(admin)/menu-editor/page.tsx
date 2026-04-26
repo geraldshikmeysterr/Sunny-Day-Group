@@ -31,7 +31,7 @@ type MenuItem = {
 
 const EMPTY_FORM = {
   name: "", description: "", weight_grams: "",
-  calories: "", proteins: "", fats: "", carbs: "", image_url: "", is_global_active: true,
+  calories: "", proteins: "", fats: "", carbs: "", image_url: "", is_global_active: false,
   active_from: "10:00", active_until: "20:00", box_quantity: "",
 };
 
@@ -112,7 +112,7 @@ function SortableCategoryBlock({ cat, items, onEditCatName, onToggleCat, onDelet
         isDragging && "opacity-40 shadow-card-lg"
       )}
     >
-      <div className="flex items-center gap-2 px-4 py-3 bg-neutral-50 border-b border-neutral-100">
+      <div className="flex items-center gap-2 px-4 py-3 bg-neutral-50 border-b border-neutral-100 group">
         <button
           {...listeners} {...attributes}
           className="cursor-grab active:cursor-grabbing text-neutral-300 hover:text-neutral-400 shrink-0 touch-none">
@@ -141,9 +141,9 @@ function SortableCategoryBlock({ cat, items, onEditCatName, onToggleCat, onDelet
           </span>
         )}
 
-        <div className="flex items-center gap-0.5 shrink-0">
+        <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
           <button onClick={() => setEditingName(true)} className="btn-ghost btn-sm text-neutral-400 hover:text-brand-500"><Edit2 size={13} /></button>
-          <button onClick={() => onToggleCat(cat)} className="btn-ghost btn-sm text-neutral-400">
+          <button onClick={() => onToggleCat(cat)} className={cn("btn-ghost btn-sm", cat.is_active ? "text-success-500" : "text-neutral-400")}>
             {cat.is_active ? <Eye size={14} /> : <EyeOff size={14} />}
           </button>
           <button onClick={() => onDeleteCat(cat)} disabled={deletingCat === cat.id} className="btn-ghost btn-sm text-danger-500">
@@ -564,7 +564,7 @@ export default function MenuEditorPage() {
               <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <input type="checkbox" checked={form.is_global_active}
                   onChange={e => setForm(p => ({ ...p, is_global_active: e.target.checked }))}
-                  className="w-4 h-4 rounded accent-brand-500" /> Активно глобально
+                  className="w-4 h-4 rounded accent-brand-500" /> Активно
               </label>
               <div className="flex gap-2">
                 <button onClick={() => setModal({ open: false, item: null, catId: "" })} className="btn-secondary btn-md">Отмена</button>

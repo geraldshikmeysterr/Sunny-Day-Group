@@ -6,9 +6,15 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { CustomSelect } from "@/components/CustomSelect";
 
-const EMPTY = { code:"", description:"", promo_type:"percent", discount_value:"", promo_scope:"order", min_order_amount:"", max_uses:"", valid_from:"", valid_until:"", city_id:"", is_active:true, item_ids:[] as string[], category_ids:[] as string[] };
-const TYPE_LABELS: Record<string,string> = { percent:"Скидка %", fixed:"Скидка ₽", set_price:"Фикс. цена" };
+const EMPTY = { code:"", description:"", promo_type:"percent", discount_value:"", promo_scope:"order", min_order_amount:"", max_uses:"", valid_from:"", valid_until:"", city_id:"", is_active:false, item_ids:[] as string[], category_ids:[] as string[] };
+const TYPE_LABELS: Record<string,string> = { percent:"Скидка %", fixed:"Скидка ₽", set_price:"Фикс. цена", free_delivery:"Бесплат. доставка" };
 const SCOPE_LABELS: Record<string,string> = { order:"На заказ", item:"На блюда", category:"На категорию" };
+
+function promoSizeLabel(p: any): string {
+  if (p.promo_type === "free_delivery") return "—";
+  if (p.promo_type === "percent") return `${p.discount_value}%`;
+  return `${p.discount_value} ₽`;
+}
 
 export default function PromosPage() {
   const supabase = createClient();
@@ -69,8 +75,8 @@ export default function PromosPage() {
     const code = form.code.toUpperCase().trim();
     if (!code) return;
     if (!/^[A-Z0-9_-]{1,50}$/.test(code)) { toast.error("Код: только буквы, цифры, _ и -, максимум 50 символов"); return; }
-    const discountValue = Number.parseFloat(form.discount_value);
-    if (Number.isNaN(discountValue) || discountValue <= 0) { toast.error("Укажите размер скидки больше 0"); return; }
+    const discountValue = form.promo_type === "free_delivery" ? 0 : Number.parseFloat(form.discount_value);
+    if (form.promo_type !== "free_delivery" && (Number.isNaN(discountValue) || discountValue <= 0)) { toast.error("Укажите размер скидки больше 0"); return; }
     if (form.promo_type === "percent" && discountValue > 100) { toast.error("Скидка в % не может превышать 100"); return; }
     setSaving(true);
     const payload = {
@@ -112,7 +118,7 @@ export default function PromosPage() {
 
   const filtered = promos.filter(p=>!search||p.code.toLowerCase().includes(search.toLowerCase())||(p.description??"").toLowerCase().includes(search.toLowerCase()));
   const statusOptions = [{value:"all",label:"Все статусы"},{value:"active",label:"Активные"},{value:"inactive",label:"Неактивные"}];
-  const typeOptions = [{value:"percent",label:"Скидка в %"},{value:"fixed",label:"Скидка в ₽"},{value:"set_price",label:"Фиксированная цена"}];
+  const typeOptions = [{value:"percent",label:"Скидка в %"},{value:"fixed",label:"Скидка в ₽"},{value:"set_price",label:"Фиксированная цена"},{value:"free_delivery",label:"Бесплатная доставка"}];
   const scopeOptions = [{value:"order",label:"На весь заказ"},{value:"item",label:"На конкретные блюда"},{value:"category",label:"На категорию"}];
   const cityOptions = [{value:"",label:"Все города"},...cities.map(c=>({value:c.id,label:c.name}))];
 
@@ -135,7 +141,7 @@ export default function PromosPage() {
               <tr key={p.id} className="group">
                 <td><p className="font-mono font-bold">{p.code}</p>{p.description&&<p className="text-xs text-neutral-400 truncate max-w-[160px]">{p.description}</p>}</td>
                 <td><span className="badge bg-sun-100 text-brand-700 text-xs">{TYPE_LABELS[p.promo_type]}</span></td>
-                <td className="font-semibold num">{p.promo_type==="percent"?`${p.discount_value}%`:`${p.discount_value} ₽`}</td>
+                <td className="font-semibold num">{promoSizeLabel(p)}</td>
                 <td className="text-sm text-neutral-500">{SCOPE_LABELS[p.promo_scope]}</td>
                 <td className="num text-sm">{p.uses_count}{p.max_uses?` / ${p.max_uses}`:""}</td>
                 <td className="text-xs text-neutral-400 whitespace-nowrap num">{p.valid_until?new Date(p.valid_until).toLocaleDateString("ru-RU"):"∞"}</td>
@@ -173,7 +179,7 @@ export default function PromosPage() {
               <div><label htmlFor="promo-desc" className="label">Описание</label><textarea id="promo-desc" value={form.description} onChange={e=>setForm((p:any)=>({...p,description:e.target.value}))} rows={3} className="textarea w-full" placeholder="Описание промокода"/></div>
               <div className="grid grid-cols-2 gap-3">
                 <div><p className="label">Тип скидки *</p><CustomSelect value={form.promo_type} onChange={v=>setForm((p:any)=>({...p,promo_type:v}))} options={typeOptions}/></div>
-                <div><label htmlFor="promo-discount" className="label">{form.promo_type==="percent"?"Размер (%)":"Сумма (₽)"} *</label><input id="promo-discount" type="number" value={form.discount_value} onChange={e=>setForm((p:any)=>({...p,discount_value:e.target.value}))} className="input" placeholder="0" autoComplete="off"/></div>
+                {form.promo_type!=="free_delivery"&&<div><label htmlFor="promo-discount" className="label">{form.promo_type==="percent"?"Размер (%)":"Сумма (₽)"} *</label><input id="promo-discount" type="number" value={form.discount_value} onChange={e=>setForm((p:any)=>({...p,discount_value:e.target.value}))} className="input" placeholder="0" autoComplete="off"/></div>}
               </div>
               <div><p className="label">Область применения</p><CustomSelect value={form.promo_scope} onChange={v=>setForm((p:any)=>({...p,promo_scope:v}))} options={scopeOptions}/></div>
               {form.promo_scope==="item"&&(

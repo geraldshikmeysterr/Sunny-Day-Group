@@ -88,7 +88,7 @@ export default function ActiveOrdersPage() {
       <div className="card p-4 flex flex-wrap gap-3 items-center sticky top-4 z-20 bg-white shadow-card">
         <div className="relative flex-1 min-w-52">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Поиск по телефону..." className="input pl-8 text-sm" autoComplete="off" />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Поиск..." className="input pl-8 text-sm" autoComplete="off" />
         </div>
         {isAdmin && <CustomSelect value={cityFilter} onChange={setCityFilter} options={cityOptions} className="w-44" />}
         <CustomSelect value={statusFilter} onChange={setStatusFilter} options={statusOptions} className="w-44" />

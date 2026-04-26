@@ -20,11 +20,13 @@ type City = {
 type CityFields = {
   name: string; phone: string; email: string;
   telegram: string; instagram: string; vk: string; max: string;
+  is_active: boolean;
   menuTypeAvailability: Record<string, boolean>;
 };
 
 const EMPTY: CityFields = {
   name: "", phone: "", email: "", telegram: "", instagram: "", vk: "", max: "",
+  is_active: false,
   menuTypeAvailability: {},
 };
 
@@ -66,7 +68,7 @@ function formatPhone(raw: string, prev: string): string {
 // ---------------------------------------------------------------------------
 function CityFormFields({ values, onChange, menuTypes }: {
   values: CityFields;
-  onChange: (field: keyof CityFields, value: string | Record<string, boolean>) => void;
+  onChange: (field: keyof CityFields, value: string | boolean | Record<string, boolean>) => void;
   menuTypes: MenuType[];
 }) {
   return (
@@ -78,6 +80,12 @@ function CityFormFields({ values, onChange, menuTypes }: {
             onChange={e => onChange("name", e.target.value)}
             className="input" placeholder="Новосибирск" />
         </div>
+        <label className="flex items-center gap-2 text-sm cursor-pointer">
+          <input type="checkbox" checked={values.is_active}
+            onChange={e => onChange("is_active", e.target.checked)}
+            className="w-4 h-4 rounded accent-brand-500" />
+          <span className="text-neutral-700">Активен</span>
+        </label>
       </div>
 
       <div className="border-t border-neutral-200 pt-4">
@@ -189,10 +197,10 @@ export default function CitiesPage() {
     });
   }, []);
 
-  function patchAdd(field: keyof CityFields, value: string | Record<string, boolean>) {
+  function patchAdd(field: keyof CityFields, value: string | boolean | Record<string, boolean>) {
     setAddForm(p => ({ ...p, [field]: value }));
   }
-  function patchEdit(field: keyof CityFields, value: string | Record<string, boolean>) {
+  function patchEdit(field: keyof CityFields, value: string | boolean | Record<string, boolean>) {
     setEditForm(p => ({ ...p, [field]: value }));
   }
 
@@ -209,7 +217,7 @@ export default function CitiesPage() {
     setSaving(true); setError("");
     try {
       const { data: newCity, error: cityError } = await supabase
-        .from("cities").insert({ name: addForm.name })
+        .from("cities").insert({ name: addForm.name, is_active: addForm.is_active })
         .select().single();
       if (cityError) throw new Error(cityError.message);
 
@@ -263,7 +271,7 @@ export default function CitiesPage() {
     setSaving(true);
     try {
       const { error } = await supabase.from("cities").update({
-        name: editForm.name,
+        name: editForm.name, is_active: editForm.is_active,
         phone: editForm.phone || null, email: editForm.email || null,
         telegram: editForm.telegram || null, instagram: editForm.instagram || null,
         vk: editForm.vk || null, max_messenger: editForm.max || null,
@@ -317,8 +325,9 @@ export default function CitiesPage() {
       if (!(mt.id in availability)) availability[mt.id] = true;
     }
     setEditForm({
-      name: city.name, phone: city.phone ?? "",
-      email: city.email ?? "", telegram: city.telegram ?? "", instagram: city.instagram ?? "",
+      name: city.name, is_active: city.is_active,
+      phone: city.phone ?? "", email: city.email ?? "",
+      telegram: city.telegram ?? "", instagram: city.instagram ?? "",
       vk: city.vk ?? "", max: city.max_messenger ?? "",
       menuTypeAvailability: availability,
     });
@@ -332,6 +341,7 @@ export default function CitiesPage() {
       );
       const changed =
         editForm.name !== editModal.name ||
+        editForm.is_active !== editModal.is_active ||
         editForm.phone !== (editModal.phone ?? "") ||
         editForm.email !== (editModal.email ?? "") ||
         editForm.telegram !== (editModal.telegram ?? "") ||
