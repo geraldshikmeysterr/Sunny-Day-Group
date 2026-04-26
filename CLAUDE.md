@@ -43,9 +43,9 @@ app/
 
 Two roles stored in Supabase DB:
 - **Superadmin** (`admins` table) — full access to all routes and all cities
-- **Operator** (`operators` table) — city-scoped; `cityId` is used to filter all data queries
+- **Operator** (`operators` table) — zone-scoped; access is determined by assigned delivery zones
 
-`AdminContext` exposes `{ isAdmin, cityId, loaded }` — use this context in any component that needs role-based filtering.
+`AdminContext` exposes `{ isAdmin, zoneIds, cityIds, loaded }` — use this context in any component that needs role-based filtering. `cityIds` and `zoneIds` are arrays derived from `operator_zones → delivery_zones`.
 
 ### Key Files
 
@@ -58,6 +58,8 @@ Two roles stored in Supabase DB:
 | `src/middleware.ts` | Auth check, nonce-based CSP (`strict-dynamic`), superadmin-only route enforcement |
 | `src/components/layout/AdminContext.tsx` | Role + cityId context provider |
 | `src/components/layout/Sidebar.tsx` | Nav with role-based link filtering |
+| `src/components/ZonesPanel.tsx` | Zone list + editor inside city modal (draw/edit polygon, operator assignment) |
+| `src/components/DeliveryZoneMap.tsx` | Yandex Maps 2.1 component — zone polygon drawing/editing + restaurant markers |
 | `tailwind.config.js` | Custom brand colors, animations, shadows |
 | `src/app/globals.css` | Component layer classes: `.btn-*`, `.input`, `.card`, `.table`, `.badge`, `.skeleton` |
 | `rls_policies.sql` | All Supabase RLS policies (apply in Supabase SQL Editor) |
@@ -88,7 +90,7 @@ Port 6543 is NOT open publicly on the VPS firewall — accessible only through t
 - **Server vs Client:** Import from `lib/supabase/server.ts` in Server Components and `lib/supabase/client.ts` in Client Components (`'use client'`)
 - **Auth:** Email/password via Supabase Auth; session managed via cookies in middleware
 - **Self-hosted:** Supabase runs on VPS `VPS_IP_REDACTED`; public URL is `https://supabase.shilmeyster.ru`
-- **RLS:** Row Level Security is enabled on all tables. Helper functions `is_admin()` and `operator_city_id()` (SECURITY DEFINER) are used in all policies. Full policy definitions are in `rls_policies.sql`.
+- **RLS:** Row Level Security is enabled on all tables. Helper functions `is_admin()`, `operator_zone_ids()`, `operator_city_ids()` (SECURITY DEFINER) are used in all policies. Full policy definitions are in `rls_policies.sql`.
 
 ### MFA (TOTP)
 
@@ -124,6 +126,30 @@ Brand colors: orange `#F57300` (primary), sun yellow `#FFE32B`, leaf green `#3E8
 
 For heading elements (`<h1>`, `<h2>`, etc.) always set `font-normal` explicitly — browsers apply bold by default and Tailwind's reset may not override it in all cases. Prefer `<p>` over `<h2>` for section labels that should look like body text.
 
+### UI Patterns
+
+**Hover-reveal action buttons (tables/lists)**
+Add `group` to the `<tr>` or outer row div; wrap buttons in a div with `opacity-0 group-hover:opacity-100 transition-opacity`. Used in: restaurants table, cities table, zone list (ZonesPanel).
+
+**Table expanding column**
+To push columns right (Hours, Status, Actions), put `className="w-full"` directly on the expanding column's `<th>` (e.g. Address). Do NOT add a separate empty spacer column — it will squeeze the target column to minimum content width instead.
+
+**Square map containers**
+Use `aspect-square flex-shrink-0` on the map wrapper. When the parent is a flex row with `h-full`, this makes width = height. Widen the modal accordingly: `max-w-[calc(88vh+520px)]` for city edit modals that contain a square map.
+
+### DeliveryZoneMap Component
+
+Props:
+- `mode`: `"view" | "draw"` — draw mode activates polygon drawing
+- `initialGeojson`: pass existing zone GeoJSON when entering draw/edit mode — vertices are pre-populated as draggable markers
+- `previewGeojson`: static polygon preview; set to `null` when in draw mode to avoid double-rendering the same zone
+- `onPolygonComplete`: callback receiving completed GeoJSON
+- Imperative handle: `mapRef.current.completePolygon()` — finalizes draw state, returns GeoJSON, clears drawing
+
+**Restaurant markers**: crimson (`#C2185B`) 20px circle with 6px white inner dot (mimics zone draw marker style). Implemented via `templateLayoutFactory.createClass()`.
+
+**Polygon editing rule**: In `saveZone()` (ZonesPanel), always call `completePolygon()` whenever `mapMode === "draw"` — regardless of whether `form.geojson` is already set. If guarded by `!form.geojson`, editing an existing zone's polygon will save the OLD geojson (bug).
+
 ### Environment Variables
 
 Required in `.env.local`:
@@ -150,9 +176,12 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 - **Operator credentials** (`cities`): email format regex + password must contain ≥1 uppercase letter and ≥1 digit
 
 ### Supabase RLS
-All tables have RLS enabled. Two DB roles:
+All tables have RLS enabled. Helper functions:
 - `is_admin()` — checks `admins` table for current `auth.uid()`
-- `operator_city_id()` — returns `city_id` from `operators` table for current `auth.uid()`
+- `operator_zone_ids()` — returns `uuid[]` of zone IDs assigned to current operator via `operator_zones`
+- `operator_city_ids()` — returns `uuid[]` of city IDs accessible to current operator (via `operator_zones → delivery_zones`)
+
+**Note:** The old `operator_city_id()` function (singular, returned one city_id from `operators.city_id`) has been removed. Operators are now zone-based — `operators.city_id` column no longer exists. Always use `operator_zone_ids()` or `operator_city_ids()` in new policies.
 
 All write operations on key tables are logged via `audit_trigger_fn()` (SECURITY DEFINER) into `audit_log`. Covered tables: `orders`, `menu_items`, `categories`, `city_menu_items`, `carousel_cards`, `promocodes`, `cities`, `operators`, `admins`, `restaurants`.
 
@@ -172,7 +201,7 @@ All menu item and carousel images are stored in self-hosted Supabase Storage at 
 ### Deployment
 - App runs in a **Docker container** (`admin-panel`) managed by Docker Compose at `VPS_DEPLOY_PATH/docker-compose.yml`
 - Build context is `VPS_APP_PATH` on the VPS
-- **Caddy** proxies `https://admin.shilmeyster.ru` → Docker container (NOT to PM2)
+- **Caddy** proxies `https://admin.shilmeyster.ru` → `admin-panel:3000` and `https://supabase.shilmeyster.ru` → `kong:8000`
 - PM2 is present on the VPS but is NOT used for this app — changes via PM2 have no effect on the live site
 - Deploy workflow:
   ```bash
@@ -182,6 +211,15 @@ All menu item and carousel images are stored in self-hosted Supabase Storage at 
   docker compose up -d admin-panel
   ```
 - Admin panel URL: `https://admin.shilmeyster.ru`
+
+**Caddy network setup:** The `caddy` container must be connected to the Supabase Docker network (`supabase_docker_default`) to resolve `kong` by container name. This was done once manually:
+```bash
+docker network connect supabase_docker_default caddy
+```
+If Caddy is recreated, re-run this command. The Caddyfile is at `VPS_DEPLOY_PATH/Caddyfile` (mounted into the container). To reload after editing:
+```bash
+docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile
+```
 
 ### Disk Maintenance
 
