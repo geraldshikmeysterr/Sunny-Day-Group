@@ -283,9 +283,9 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
   async function saveZone() {
     if (!form) return;
 
-    // Auto-finalize polygon if still in draw mode
+    // Auto-finalize polygon if still in draw mode (works for both new and edited zones)
     let currentForm = form;
-    if (mapMode === "draw" && !form.geojson) {
+    if (mapMode === "draw") {
       const geojson = mapRef.current?.completePolygon() ?? null;
       if (geojson) currentForm = { ...form, geojson };
     }
