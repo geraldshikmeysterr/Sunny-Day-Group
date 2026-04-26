@@ -6,9 +6,20 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { CustomSelect } from "@/components/CustomSelect";
 
-const EMPTY = { code:"", description:"", promo_type:"percent", discount_value:"", promo_scope:"order", min_order_amount:"", max_uses:"", valid_from:"", valid_until:"", city_id:"", is_active:false, item_ids:[] as string[], category_ids:[] as string[] };
-const TYPE_LABELS: Record<string,string> = { percent:"Скидка %", fixed:"Скидка ₽", set_price:"Фикс. цена", free_delivery:"Бесплат. доставка" };
-const SCOPE_LABELS: Record<string,string> = { order:"На заказ", item:"На блюда", category:"На категорию" };
+const EMPTY = {
+  code:"", description:"", promo_type:"percent", discount_value:"",
+  promo_scope:"order", menu_type_scope:"both",
+  min_order_amount:"", max_uses:"", valid_from:"", valid_until:"",
+  city_id:"", is_active:false,
+  item_ids:[] as string[], category_ids:[] as string[],
+};
+
+const TYPE_LABELS: Record<string,string> = {
+  percent:"Скидка %", fixed:"Скидка ₽", set_price:"Фикс. цена", free_delivery:"Бесплат. доставка",
+};
+const SCOPE_LABELS: Record<string,string> = {
+  order:"На заказ", item:"На блюда", category:"На категорию",
+};
 
 function promoSizeLabel(p: any): string {
   if (p.promo_type === "free_delivery") return "—";
@@ -16,33 +27,46 @@ function promoSizeLabel(p: any): string {
   return `${p.discount_value} ₽`;
 }
 
+const MENU_TYPE_SCOPE_OPTIONS = [
+  { value: "both",        label: "Готовые и замороженные" },
+  { value: "ready_meals", label: "Готовые блюда" },
+  { value: "frozen",      label: "Замороженная продукция" },
+];
+
 export default function PromosPage() {
   const supabase = createClient();
-  const [promos, setPromos] = useState<any[]>([]);
-  const [cities, setCities] = useState<any[]>([]);
+  const [promos,     setPromos]     = useState<any[]>([]);
+  const [cities,     setCities]     = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
-  const [menuItems, setMenuItems] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [modal, setModal] = useState(false);
-  const [editing, setEditing] = useState<any|null>(null);
-  const [form, setForm] = useState<any>({...EMPTY});
-  const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState<string | null>(null);
+  const [menuItems,  setMenuItems]  = useState<any[]>([]);
+  const [menuTypes,  setMenuTypes]  = useState<any[]>([]);
+  const [loading,    setLoading]    = useState(true);
+  const [modal,      setModal]      = useState(false);
+  const [editing,    setEditing]    = useState<any|null>(null);
+  const [form,       setForm]       = useState<any>({...EMPTY});
+  const [saving,     setSaving]     = useState(false);
+  const [deleting,   setDeleting]   = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState("all");
-  const [search, setSearch] = useState("");
+  const [search,     setSearch]     = useState("");
 
   useEffect(() => {
     Promise.all([
-      supabase.from("cities").select("id,name").eq("is_active",true),
-      supabase.from("categories").select("id,name"),
-      supabase.from("menu_items").select("id,name").eq("is_global_active",true).order("name"),
-    ]).then(([{data:c},{data:cats},{data:mi}])=>{ setCities(c??[]); setCategories(cats??[]); setMenuItems(mi??[]); });
+      supabase.from("cities").select("id,name,city_menu_types(menu_type_id,is_available)").eq("is_active",true).order("name"),
+      supabase.from("categories").select("id,name,menu_type_id").order("name"),
+      supabase.from("menu_items").select("id,name,category_id").eq("is_global_active",true).order("name"),
+      supabase.from("menu_types").select("id,slug,name"),
+    ]).then(([{data:c},{data:cats},{data:mi},{data:mt}])=>{
+      setCities(c??[]);
+      setCategories(cats??[]);
+      setMenuItems(mi??[]);
+      setMenuTypes(mt??[]);
+    });
   }, []);
 
   const fetchPromos = useCallback(async () => {
     setLoading(true);
     let q = supabase.from("promocodes").select("*").order("created_at",{ascending:false});
-    if (statusFilter==="active") q = q.eq("is_active",true);
+    if (statusFilter==="active")   q = q.eq("is_active",true);
     if (statusFilter==="inactive") q = q.eq("is_active",false);
     const { data } = await q;
     setPromos(data??[]); setLoading(false);
@@ -58,7 +82,8 @@ export default function PromosPage() {
       description: p.description ?? "",
       promo_type: p.promo_type,
       discount_value: String(p.discount_value),
-      promo_scope: p.promo_scope,
+      promo_scope: p.promo_scope ?? "order",
+      menu_type_scope: p.menu_type_scope ?? "both",
       min_order_amount: p.min_order_amount ? String(p.min_order_amount) : "",
       max_uses: p.max_uses ? String(p.max_uses) : "",
       valid_from: p.valid_from ? p.valid_from.slice(0, 16) : "",
@@ -79,14 +104,16 @@ export default function PromosPage() {
     if (form.promo_type !== "free_delivery" && (Number.isNaN(discountValue) || discountValue <= 0)) { toast.error("Укажите размер скидки больше 0"); return; }
     if (form.promo_type === "percent" && discountValue > 100) { toast.error("Скидка в % не может превышать 100"); return; }
     setSaving(true);
+    const isFree = form.promo_type === "free_delivery";
     const payload = {
       code,
       description: form.description || null,
       promo_type: form.promo_type,
       discount_value: discountValue,
-      promo_scope: form.promo_scope,
-      item_ids: form.promo_scope === "item" ? form.item_ids : null,
-      category_ids: form.promo_scope === "category" ? form.category_ids : null,
+      promo_scope: isFree ? "order" : form.promo_scope,
+      menu_type_scope: form.menu_type_scope,
+      item_ids: !isFree && form.promo_scope === "item" ? form.item_ids : null,
+      category_ids: !isFree && form.promo_scope === "category" ? form.category_ids : null,
       min_order_amount: form.min_order_amount ? Number.parseFloat(form.min_order_amount) : null,
       max_uses: form.max_uses ? Number.parseInt(form.max_uses) : null,
       valid_from: form.valid_from || null,
@@ -116,11 +143,43 @@ export default function PromosPage() {
     setDeleting(null);
   }
 
-  const filtered = promos.filter(p=>!search||p.code.toLowerCase().includes(search.toLowerCase())||(p.description??"").toLowerCase().includes(search.toLowerCase()));
-  const statusOptions = [{value:"all",label:"Все статусы"},{value:"active",label:"Активные"},{value:"inactive",label:"Неактивные"}];
-  const typeOptions = [{value:"percent",label:"Скидка в %"},{value:"fixed",label:"Скидка в ₽"},{value:"set_price",label:"Фиксированная цена"},{value:"free_delivery",label:"Бесплатная доставка"}];
-  const scopeOptions = [{value:"order",label:"На весь заказ"},{value:"item",label:"На конкретные блюда"},{value:"category",label:"На категорию"}];
-  const cityOptions = [{value:"",label:"Все города"},...cities.map(c=>({value:c.id,label:c.name}))];
+  // ── Filtering helpers ────────────────────────────────────────────────────────
+  const typeIdBySlug = Object.fromEntries(menuTypes.map(t => [t.slug, t.id]));
+
+  function cityMatchesScope(city: any, scope: string): boolean {
+    if (scope === "both") return true;
+    const typeId = typeIdBySlug[scope];
+    if (!typeId) return true;
+    const cmt = (city.city_menu_types ?? []).find((t: any) => t.menu_type_id === typeId);
+    return cmt ? cmt.is_available : true;
+  }
+
+  function catMatchesScope(cat: any, scope: string): boolean {
+    if (scope === "both") return true;
+    const typeId = typeIdBySlug[scope];
+    return cat.menu_type_id === typeId;
+  }
+
+  // Build a map of category_id → menu_type_id for item filtering
+  const catTypeMap = Object.fromEntries(categories.map(c => [c.id, c.menu_type_id]));
+  function itemMatchesScope(item: any, scope: string): boolean {
+    if (scope === "both") return true;
+    const typeId = typeIdBySlug[scope];
+    return catTypeMap[item.category_id] === typeId;
+  }
+
+  const filteredCities     = cities.filter(c => cityMatchesScope(c, form.menu_type_scope));
+  const filteredCategories = categories.filter(c => catMatchesScope(c, form.menu_type_scope));
+  const filteredMenuItems  = menuItems.filter(i => itemMatchesScope(i, form.menu_type_scope));
+
+  // ── Options ─────────────────────────────────────────────────────────────────
+  const filtered       = promos.filter(p=>!search||p.code.toLowerCase().includes(search.toLowerCase())||(p.description??"").toLowerCase().includes(search.toLowerCase()));
+  const statusOptions  = [{value:"all",label:"Все статусы"},{value:"active",label:"Активные"},{value:"inactive",label:"Неактивные"}];
+  const typeOptions    = [{value:"percent",label:"Скидка в %"},{value:"fixed",label:"Скидка в ₽"},{value:"set_price",label:"Фиксированная цена"},{value:"free_delivery",label:"Бесплатная доставка"}];
+  const scopeOptions   = [{value:"order",label:"На весь заказ"},{value:"item",label:"На конкретные блюда"},{value:"category",label:"На категорию"}];
+  const cityOptions    = [{value:"",label:"Все города"},...filteredCities.map(c=>({value:c.id,label:c.name}))];
+
+  const isFreeDelivery = form.promo_type === "free_delivery";
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-5">
@@ -172,20 +231,52 @@ export default function PromosPage() {
               <button onClick={()=>setModal(false)} className="btn-ghost btn-sm"><X size={16}/></button>
             </div>
             <div className="overflow-y-auto flex-1 p-6 space-y-4">
+              {/* Код + Город */}
               <div className="grid grid-cols-2 gap-3">
                 <div><label htmlFor="promo-code" className="label">Код *</label><input id="promo-code" value={form.code} onChange={e=>setForm((p:any)=>({...p,code:e.target.value.toUpperCase().replaceAll(/[^A-Z0-9_-]/g,"")}))} className="input font-mono" placeholder="SUNNY20" maxLength={50} autoComplete="off"/></div>
                 <div><p className="label">Город</p><CustomSelect value={form.city_id} onChange={v=>setForm((p:any)=>({...p,city_id:v}))} options={cityOptions}/></div>
               </div>
+
+              {/* Описание */}
               <div><label htmlFor="promo-desc" className="label">Описание</label><textarea id="promo-desc" value={form.description} onChange={e=>setForm((p:any)=>({...p,description:e.target.value}))} rows={3} className="textarea w-full" placeholder="Описание промокода"/></div>
+
+              {/* Тип скидки + (Размер ИЛИ Тип меню для free_delivery) */}
               <div className="grid grid-cols-2 gap-3">
-                <div><p className="label">Тип скидки *</p><CustomSelect value={form.promo_type} onChange={v=>setForm((p:any)=>({...p,promo_type:v}))} options={typeOptions}/></div>
-                {form.promo_type!=="free_delivery"&&<div><label htmlFor="promo-discount" className="label">{form.promo_type==="percent"?"Размер (%)":"Сумма (₽)"} *</label><input id="promo-discount" type="number" value={form.discount_value} onChange={e=>setForm((p:any)=>({...p,discount_value:e.target.value}))} className="input" placeholder="0" autoComplete="off"/></div>}
+                <div>
+                  <p className="label">Тип скидки *</p>
+                  <CustomSelect value={form.promo_type} onChange={v=>setForm((p:any)=>({...p,promo_type:v}))} options={typeOptions}/>
+                </div>
+                {isFreeDelivery
+                  ? <div>
+                      <p className="label">Тип меню</p>
+                      <CustomSelect value={form.menu_type_scope} onChange={v=>setForm((p:any)=>({...p,menu_type_scope:v,city_id:""}))} options={MENU_TYPE_SCOPE_OPTIONS}/>
+                    </div>
+                  : <div>
+                      <label htmlFor="promo-discount" className="label">{form.promo_type==="percent"?"Размер (%)":"Сумма (₽)"} *</label>
+                      <input id="promo-discount" type="number" value={form.discount_value} onChange={e=>setForm((p:any)=>({...p,discount_value:e.target.value}))} className="input" placeholder="0" autoComplete="off"/>
+                    </div>
+                }
               </div>
-              <div><p className="label">Область применения</p><CustomSelect value={form.promo_scope} onChange={v=>setForm((p:any)=>({...p,promo_scope:v}))} options={scopeOptions}/></div>
-              {form.promo_scope==="item"&&(
+
+              {/* Область применения + Тип меню (только для не-free_delivery) */}
+              {!isFreeDelivery&&(
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="label">Область применения</p>
+                    <CustomSelect value={form.promo_scope} onChange={v=>setForm((p:any)=>({...p,promo_scope:v}))} options={scopeOptions}/>
+                  </div>
+                  <div>
+                    <p className="label">Тип меню</p>
+                    <CustomSelect value={form.menu_type_scope} onChange={v=>setForm((p:any)=>({...p,menu_type_scope:v,city_id:"",item_ids:[],category_ids:[]}))} options={MENU_TYPE_SCOPE_OPTIONS}/>
+                  </div>
+                </div>
+              )}
+
+              {/* Блюда / Категории (только для не-free_delivery) */}
+              {!isFreeDelivery&&form.promo_scope==="item"&&(
                 <div><p className="label">Блюда</p>
                   <div className="border border-neutral-200 rounded-lg p-2 max-h-40 overflow-y-auto space-y-0.5">
-                    {menuItems.map((item:any)=>(
+                    {filteredMenuItems.map((item:any)=>(
                       <button key={item.id} type="button"
                         onClick={()=>setForm((p:any)=>({...p,item_ids:p.item_ids.includes(item.id)?p.item_ids.filter((id:string)=>id!==item.id):[...p.item_ids,item.id]}))}
                         className="flex items-center gap-2.5 w-full px-2 py-1.5 text-sm text-left hover:bg-neutral-50 rounded transition-colors">
@@ -198,10 +289,10 @@ export default function PromosPage() {
                   </div>
                 </div>
               )}
-              {form.promo_scope==="category"&&(
+              {!isFreeDelivery&&form.promo_scope==="category"&&(
                 <div><p className="label">Категории</p>
                   <div className="border border-neutral-200 rounded-lg p-2 max-h-40 overflow-y-auto space-y-0.5">
-                    {categories.map((cat:any)=>(
+                    {filteredCategories.map((cat:any)=>(
                       <button key={cat.id} type="button"
                         onClick={()=>setForm((p:any)=>({...p,category_ids:p.category_ids.includes(cat.id)?p.category_ids.filter((id:string)=>id!==cat.id):[...p.category_ids,cat.id]}))}
                         className="flex items-center gap-2.5 w-full px-2 py-1.5 text-sm text-left hover:bg-neutral-50 rounded transition-colors">
@@ -214,6 +305,8 @@ export default function PromosPage() {
                   </div>
                 </div>
               )}
+
+              {/* Дополнительные параметры */}
               <div className="grid grid-cols-2 gap-3">
                 <div><label htmlFor="promo-min" className="label">Мин. сумма (₽)</label><input id="promo-min" type="number" value={form.min_order_amount} onChange={e=>setForm((p:any)=>({...p,min_order_amount:e.target.value}))} className="input" placeholder="0" autoComplete="off"/></div>
                 <div><label htmlFor="promo-max-uses" className="label">Макс. использований</label><input id="promo-max-uses" type="number" value={form.max_uses} onChange={e=>setForm((p:any)=>({...p,max_uses:e.target.value}))} className="input" placeholder="∞" autoComplete="off"/></div>

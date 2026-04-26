@@ -142,7 +142,7 @@ function SortableCategoryBlock({ cat, items, onEditCatName, onToggleCat, onDelet
         )}
 
         <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button onClick={() => setEditingName(true)} className="btn-ghost btn-sm text-neutral-400 hover:text-brand-500"><Edit2 size={13} /></button>
+          <button onClick={() => setEditingName(true)} className="btn-ghost btn-sm text-brand-500"><Edit2 size={13} /></button>
           <button onClick={() => onToggleCat(cat)} className={cn("btn-ghost btn-sm", cat.is_active ? "text-success-500" : "text-neutral-400")}>
             {cat.is_active ? <Eye size={14} /> : <EyeOff size={14} />}
           </button>
