@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { formatDateTime, ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, ALLOWED_TRANSITIONS } from "@/lib/utils";
 import { useAdmin } from "@/components/layout/AdminContext";
@@ -39,21 +39,28 @@ export default function ActiveOrdersPage() {
       if (!isAdmin && zoneIds.length > 0) q = q.in("delivery_zone_id", zoneIds);
       else if (isAdmin && cityFilter !== "all") q = q.eq("city_id", cityFilter);
       if (statusFilter !== "all") q = q.eq("status", statusFilter);
+      if (search.trim()) {
+        const safe = search.trim().replaceAll(/[%_\\]/g, String.raw`\$&`);
+        q = q.or(`id.ilike.${safe}%,profiles.phone.ilike.%${safe}%`);
+      }
       const { data, count } = await q;
       setOrders(data ?? []); setTotal(count ?? 0);
     } catch { toast.error("Ошибка загрузки"); }
     finally { setLoading(false); }
-  }, [page, statusFilter, cityFilter, isAdmin, zoneIds]);
+  }, [page, statusFilter, cityFilter, isAdmin, zoneIds, search]);
 
   useEffect(() => { fetchOrders(); }, [fetchOrders]);
-  useEffect(() => { setPage(0); }, [statusFilter, cityFilter]);
+  useEffect(() => { setPage(0); }, [statusFilter, cityFilter, search]);
+
+  const fetchOrdersRef = useRef(fetchOrders);
+  useEffect(() => { fetchOrdersRef.current = fetchOrders; }, [fetchOrders]);
 
   useEffect(() => {
     const ch = supabase.channel("orders-rt")
-      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, fetchOrders)
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => fetchOrdersRef.current())
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [fetchOrders]);
+  }, []);
 
   async function advance(orderId: string, next: OrderStatus) {
     setUpdating(orderId);
@@ -68,7 +75,6 @@ export default function ActiveOrdersPage() {
     setUpdating(null);
   }
 
-  const filtered = orders.filter(o => !search || o.profiles?.phone?.includes(search) || o.id.slice(0,8).includes(search.toLowerCase()));
   const totalPages = Math.ceil(total / PAGE_SIZE);
   const cityOptions = [{ value: "all", label: "Все города" }, ...cities.map(c => ({ value: c.id, label: c.name }))];
   const statusOptions = [{ value: "all", label: "Все статусы" }, ...ACTIVE.map(s => ({ value: s, label: ORDER_STATUS_LABELS[s] }))];
@@ -93,7 +99,7 @@ export default function ActiveOrdersPage() {
             <thead><tr><th>Заказ</th><th>Клиент</th>{isAdmin && <th>Город</th>}<th>Адрес</th><th>Состав</th><th>Комментарий</th><th>Сумма</th><th>Статус</th><th>Дата</th><th></th></tr></thead>
             <tbody>
               {loading && Array.from({length:5},(_,i)=>i).map(i=><tr key={`sk-${i}`}>{Array.from({length:isAdmin?10:9},(_,j)=>j).map(j=><td key={`sk-col-${j}`}><div className="skeleton h-4 w-full"/></td>)}</tr>)}
-              {!loading && filtered.map(order => {
+              {!loading && orders.map(order => {
                 const c = ORDER_STATUS_COLORS[order.status as OrderStatus];
                 const nextStatus = ALLOWED_TRANSITIONS[order.status as OrderStatus].find(s => s !== "cancelled");
                 const addr = order.addresses?.full_address ?? `${order.addresses?.street??""} ${order.addresses?.house??""}`.trim();
@@ -113,7 +119,7 @@ export default function ActiveOrdersPage() {
                   </tr>
                 );
               })}
-              {!loading&&!filtered.length&&<tr><td colSpan={isAdmin?10:9} className="py-16 text-center text-neutral-400">Нет активных заказов</td></tr>}
+              {!loading&&!orders.length&&<tr><td colSpan={isAdmin?10:9} className="py-16 text-center text-neutral-400">Нет активных заказов</td></tr>}
             </tbody>
           </table>
         </div>

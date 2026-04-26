@@ -77,11 +77,21 @@ export default function RestaurantsPage() {
     setSaving(true);
     try {
       const [rawLat, rawLng] = form.coords.split(",").map(s => s.trim());
+      const lat = rawLat ? Number.parseFloat(rawLat) : null;
+      const lng = rawLng ? Number.parseFloat(rawLng) : null;
+      if (lat !== null && (Number.isNaN(lat) || lat < -90 || lat > 90)) {
+        toast.error("Широта должна быть от −90 до 90");
+        setSaving(false); return;
+      }
+      if (lng !== null && (Number.isNaN(lng) || lng < -180 || lng > 180)) {
+        toast.error("Долгота должна быть от −180 до 180");
+        setSaving(false); return;
+      }
       const payload = {
         address: form.address,
         working_hours: form.working_hours || null,
-        lat: rawLat ? Number.parseFloat(rawLat) : null,
-        lng: rawLng ? Number.parseFloat(rawLng) : null,
+        lat,
+        lng,
         is_active: form.is_active,
         city_id: form.city_id || opCityIds[0],
       };

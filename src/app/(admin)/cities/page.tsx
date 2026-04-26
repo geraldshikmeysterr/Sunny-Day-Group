@@ -209,12 +209,13 @@ export default function CitiesPage() {
     if (!editModal) return;
     setSaving(true);
     try {
-      await supabase.from("cities").update({
+      const { error } = await supabase.from("cities").update({
         name: editForm.name,
         phone: editForm.phone || null, email: editForm.email || null,
         telegram: editForm.telegram || null, instagram: editForm.instagram || null,
         vk: editForm.vk || null, max_messenger: editForm.max || null,
       }).eq("id", editModal.id);
+      if (error) { toast.error(error.message); setSaving(false); return; }
       toast.success("Город сохранён");
       setEditModal(null); setEditForm(EMPTY); await fetchData();
     } catch (e: any) { toast.error(e.message); }
@@ -228,9 +229,7 @@ export default function CitiesPage() {
       const { count } = await supabase
         .from("orders").select("id", { count: "exact", head: true }).eq("city_id", city.id);
       if (count && count > 0) {
-        setDeleting(null);
-        if (!confirm(`В городе «${city.name}» есть ${count} заказов.\nУдалить все заказы и сам город?`)) return;
-        setDeleting(city.id);
+        if (!confirm(`В городе «${city.name}» есть ${count} заказов.\nУдалить все заказы и сам город?`)) { setDeleting(null); return; }
         const { error: ordErr } = await supabase.from("orders").delete().eq("city_id", city.id);
         if (ordErr) { toast.error(ordErr.message); setDeleting(null); return; }
       }
@@ -254,6 +253,22 @@ export default function CitiesPage() {
       vk: city.vk ?? "", max: city.max_messenger ?? "",
     });
     setEditModal(city); setError("");
+  }
+
+  function closeEditModal() {
+    if (editModal) {
+      const changed =
+        editForm.name !== editModal.name ||
+        editForm.phone !== (editModal.phone ?? "") ||
+        editForm.email !== (editModal.email ?? "") ||
+        editForm.telegram !== (editModal.telegram ?? "") ||
+        editForm.instagram !== (editModal.instagram ?? "") ||
+        editForm.vk !== (editModal.vk ?? "") ||
+        editForm.max !== (editModal.max_messenger ?? "");
+      if (changed && !confirm("Есть несохранённые изменения. Закрыть без сохранения?")) return;
+    }
+    setEditModal(null);
+    setEditForm(EMPTY);
   }
 
   // ------------------------------------------------------------------
@@ -376,7 +391,7 @@ export default function CitiesPage() {
           <div className="bg-white rounded-2xl shadow-card-lg w-full max-w-[calc(88vh+520px)] h-[88vh] flex flex-col animate-scale-in overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-200 flex-shrink-0">
               <h2 className="text-xl font-semibold">Редактировать город</h2>
-              <button onClick={() => setEditModal(null)} className="btn-ghost btn-sm"><X size={16}/></button>
+              <button onClick={closeEditModal} className="btn-ghost btn-sm"><X size={16}/></button>
             </div>
             <div className="flex flex-1 min-h-0">
               <div className="w-80 flex-shrink-0 border-r border-neutral-200 flex flex-col">
@@ -384,7 +399,7 @@ export default function CitiesPage() {
                   <CityFormFields values={editForm} onChange={patchEdit} />
                 </div>
                 <div className="flex justify-end gap-2 px-6 py-4 border-t border-neutral-200 flex-shrink-0">
-                  <button onClick={() => setEditModal(null)} className="btn-secondary btn-md">Отмена</button>
+                  <button onClick={closeEditModal} className="btn-secondary btn-md">Отмена</button>
                   <button onClick={saveCity} disabled={saving} className="btn-primary btn-md">
                     {saving && <Loader2 size={14} className="animate-spin"/>} Сохранить
                   </button>

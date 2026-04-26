@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { Plus, X, Loader2, Search, Check } from "lucide-react";
+import { Plus, X, Loader2, Search, Check, Edit2, Eye, EyeOff, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { CustomSelect } from "@/components/CustomSelect";
@@ -21,6 +21,7 @@ export default function PromosPage() {
   const [editing, setEditing] = useState<any|null>(null);
   const [form, setForm] = useState<any>({...EMPTY});
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState("all");
   const [search, setSearch] = useState("");
 
@@ -46,7 +47,21 @@ export default function PromosPage() {
   function openAdd() { setEditing(null); setForm({...EMPTY}); setModal(true); }
   function openEdit(p:any) {
     setEditing(p);
-    setForm({code:p.code,description:p.description??"",promo_type:p.promo_type,discount_value:String(p.discount_value),promo_scope:p.promo_scope,min_order_amount:p.min_order_amount?String(p.min_order_amount):"",max_uses:p.max_uses?String(p.max_uses):"",valid_from:p.valid_from?p.valid_from.slice(0,16):"",valid_until:p.valid_until?p.valid_until.slice(0,16):"",city_id:p.city_id??"",is_active:p.is_active,item_ids:[],category_ids:[]});
+    setForm({
+      code: p.code,
+      description: p.description ?? "",
+      promo_type: p.promo_type,
+      discount_value: String(p.discount_value),
+      promo_scope: p.promo_scope,
+      min_order_amount: p.min_order_amount ? String(p.min_order_amount) : "",
+      max_uses: p.max_uses ? String(p.max_uses) : "",
+      valid_from: p.valid_from ? p.valid_from.slice(0, 16) : "",
+      valid_until: p.valid_until ? p.valid_until.slice(0, 16) : "",
+      city_id: p.city_id ?? "",
+      is_active: p.is_active,
+      item_ids: p.item_ids ?? [],
+      category_ids: p.category_ids ?? [],
+    });
     setModal(true);
   }
 
@@ -58,16 +73,41 @@ export default function PromosPage() {
     if (Number.isNaN(discountValue) || discountValue <= 0) { toast.error("Укажите размер скидки больше 0"); return; }
     if (form.promo_type === "percent" && discountValue > 100) { toast.error("Скидка в % не может превышать 100"); return; }
     setSaving(true);
-    const payload = {code,description:form.description||null,promo_type:form.promo_type,discount_value:discountValue,promo_scope:form.promo_scope,min_order_amount:form.min_order_amount?Number.parseFloat(form.min_order_amount):null,max_uses:form.max_uses?Number.parseInt(form.max_uses):null,valid_from:form.valid_from||null,valid_until:form.valid_until||null,city_id:form.city_id||null,is_active:form.is_active};
-    if (editing) await supabase.from("promocodes").update(payload).eq("id",editing.id);
-    else await supabase.from("promocodes").insert(payload);
-    toast.success(editing?"Промокод обновлён":"Промокод создан");
+    const payload = {
+      code,
+      description: form.description || null,
+      promo_type: form.promo_type,
+      discount_value: discountValue,
+      promo_scope: form.promo_scope,
+      item_ids: form.promo_scope === "item" ? form.item_ids : null,
+      category_ids: form.promo_scope === "category" ? form.category_ids : null,
+      min_order_amount: form.min_order_amount ? Number.parseFloat(form.min_order_amount) : null,
+      max_uses: form.max_uses ? Number.parseInt(form.max_uses) : null,
+      valid_from: form.valid_from || null,
+      valid_until: form.valid_until || null,
+      city_id: form.city_id || null,
+      is_active: form.is_active,
+    };
+    const { error } = editing
+      ? await supabase.from("promocodes").update(payload).eq("id", editing.id)
+      : await supabase.from("promocodes").insert(payload);
+    if (error) { toast.error(error.message); setSaving(false); return; }
+    toast.success(editing ? "Промокод обновлён" : "Промокод создан");
     setModal(false); await fetchPromos(); setSaving(false);
   }
 
   async function togglePromo(id:string, current:boolean) {
     await supabase.from("promocodes").update({is_active:!current}).eq("id",id);
     setPromos(p=>p.map(pr=>pr.id===id?{...pr,is_active:!current}:pr));
+  }
+
+  async function deletePromo(p:any) {
+    if (!confirm(`Удалить промокод «${p.code}»?`)) return;
+    setDeleting(p.id);
+    const { error } = await supabase.from("promocodes").delete().eq("id", p.id);
+    if (error) { toast.error(error.message); }
+    else { setPromos(prev => prev.filter(pr => pr.id !== p.id)); toast.success("Промокод удалён"); }
+    setDeleting(null);
   }
 
   const filtered = promos.filter(p=>!search||p.code.toLowerCase().includes(search.toLowerCase())||(p.description??"").toLowerCase().includes(search.toLowerCase()));
@@ -92,7 +132,7 @@ export default function PromosPage() {
           <tbody>
             {loading&&Array.from({length:4},(_,i)=>i).map(i=><tr key={`sk-${i}`}>{Array.from({length:8},(_,j)=>j).map(j=><td key={`sk-col-${j}`}><div className="skeleton h-4"/></td>)}</tr>)}
             {!loading&&filtered.map(p=>(
-              <tr key={p.id} className="cursor-pointer" onClick={()=>openEdit(p)}>
+              <tr key={p.id} className="group">
                 <td><p className="font-mono font-bold">{p.code}</p>{p.description&&<p className="text-xs text-neutral-400 truncate max-w-[160px]">{p.description}</p>}</td>
                 <td><span className="badge bg-sun-100 text-brand-700 text-xs">{TYPE_LABELS[p.promo_type]}</span></td>
                 <td className="font-semibold num">{p.promo_type==="percent"?`${p.discount_value}%`:`${p.discount_value} ₽`}</td>
@@ -100,7 +140,17 @@ export default function PromosPage() {
                 <td className="num text-sm">{p.uses_count}{p.max_uses?` / ${p.max_uses}`:""}</td>
                 <td className="text-xs text-neutral-400 whitespace-nowrap num">{p.valid_until?new Date(p.valid_until).toLocaleDateString("ru-RU"):"∞"}</td>
                 <td><span className={cn("badge text-xs",p.is_active?"bg-success-50 text-success-700":"bg-neutral-100 text-neutral-500")}>{p.is_active?"Активен":"Откл."}</span></td>
-                <td onClick={e=>e.stopPropagation()}><button onClick={()=>togglePromo(p.id,p.is_active)} className="btn-ghost btn-sm text-xs text-neutral-500">{p.is_active?"Откл.":"Вкл."}</button></td>
+                <td>
+                  <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onClick={()=>openEdit(p)} className="btn-ghost btn-sm text-brand-500"><Edit2 size={14}/></button>
+                    <button onClick={()=>togglePromo(p.id,p.is_active)} className={cn("btn-ghost btn-sm",p.is_active?"text-success-600":"text-neutral-400")}>
+                      {p.is_active?<Eye size={14}/>:<EyeOff size={14}/>}
+                    </button>
+                    <button onClick={()=>deletePromo(p)} disabled={deleting===p.id} className="btn-ghost btn-sm text-danger-500">
+                      {deleting===p.id?<Loader2 size={14} className="animate-spin"/>:<Trash2 size={14}/>}
+                    </button>
+                  </div>
+                </td>
               </tr>
             ))}
             {!loading&&!filtered.length&&<tr><td colSpan={8} className="py-16 text-center text-neutral-400">Нет промокодов</td></tr>}

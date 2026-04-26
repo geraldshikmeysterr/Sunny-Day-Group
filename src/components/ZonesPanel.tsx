@@ -123,6 +123,7 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
   const [mapKey, setMapKey] = useState(0);
   const [formError, setFormError] = useState("");
   const mapRef = useRef<DeliveryZoneMapHandle>(null);
+  const initialFormRef = useRef<ZoneForm | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -170,13 +171,15 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
   // ------------------------------------------------------------------
 
   function openAdd() {
-    setForm({ ...EMPTY_FORM });
+    const f = { ...EMPTY_FORM };
+    setForm(f);
+    initialFormRef.current = f;
     setMapMode("draw");
     setFormError("");
   }
 
   function openEdit(zone: FullZone) {
-    setForm({
+    const f: ZoneForm = {
       id: zone.id,
       name: zone.name,
       delivery_fee: String(zone.delivery_fee),
@@ -184,7 +187,9 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
       min_order: String(zone.min_order),
       geojson: zone.geojson,
       opEmail: "", opPassword: "", showOpPw: false,
-    });
+    };
+    setForm(f);
+    initialFormRef.current = f;
     setMapMode("view");
     setFormError("");
     // Load current operator email for this zone
@@ -195,11 +200,26 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
       .maybeSingle()
       .then(({ data }) => {
         const email = (data?.operators as any)?.email ?? "";
-        if (email) setForm(prev => prev ? { ...prev, opEmail: email } : prev);
+        if (email) {
+          setForm(prev => prev ? { ...prev, opEmail: email } : prev);
+          initialFormRef.current = initialFormRef.current
+            ? { ...initialFormRef.current, opEmail: email }
+            : null;
+        }
       });
   }
 
   function cancelForm() {
+    if (form && initialFormRef.current) {
+      const init = initialFormRef.current;
+      const changed =
+        form.name !== init.name ||
+        form.delivery_fee !== init.delivery_fee ||
+        form.min_order !== init.min_order ||
+        form.free_from !== init.free_from ||
+        form.geojson !== init.geojson;
+      if (changed && !confirm("Есть несохранённые изменения. Закрыть без сохранения?")) return;
+    }
     setForm(null);
     setMapMode("view");
     setFormError("");
@@ -218,10 +238,15 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
     const free = f.free_from.trim() ? Number(f.free_from) : null;
     if (free !== null && (Number.isNaN(free) || free < 0)) return "Некорректная сумма для бесплатной доставки";
     if (!isPending) {
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.opEmail)) return "Некорректный email оператора";
-      // Password required only when creating new zone (no id yet)
-      if (!f.id && (f.opPassword.length < 8 || !/[A-Z]/.test(f.opPassword) || !/\d/.test(f.opPassword)))
-        return "Пароль: минимум 8 символов, одна заглавная буква и одна цифра";
+      if (!f.id) {
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.opEmail)) return "Некорректный email оператора";
+        if (f.opPassword.length < 8 || !/[A-Z]/.test(f.opPassword) || !/\d/.test(f.opPassword))
+          return "Пароль: минимум 8 символов, одна заглавная буква и одна цифра";
+      } else {
+        if (f.opEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.opEmail)) return "Некорректный email оператора";
+        if (f.opPassword && (f.opPassword.length < 8 || !/[A-Z]/.test(f.opPassword) || !/\d/.test(f.opPassword)))
+          return "Пароль: минимум 8 символов, одна заглавная буква и одна цифра";
+      }
     }
     return "";
   }
@@ -315,7 +340,7 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
         );
         const zoneId = await Promise.race([applyDbZone(base, savedForm.id), timeout]);
         if (zoneId) {
-          await saveZoneOperator(zoneId, savedForm);
+          if (savedForm.opEmail) await saveZoneOperator(zoneId, savedForm);
           toast.success(savedForm.id ? "Зона обновлена" : "Зона добавлена");
           setForm(null);
           setMapMode("view");
@@ -362,13 +387,20 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
     if (!over || active.id === over.id) return;
     const oldIndex = zones.findIndex((z) => z.id === active.id);
     const newIndex = zones.findIndex((z) => z.id === over.id);
+    const previous = zones;
     const reordered = arrayMove(zones, oldIndex, newIndex).map((z, i) => ({ ...z, sort_order: i }));
     setZones(reordered);
     syncPending(reordered);
     if (!isPending) {
-      await Promise.all(
-        reordered.map((z) => supabase.from("delivery_zones").update({ sort_order: z.sort_order }).eq("id", z.id))
+      const { error } = await supabase.from("delivery_zones").upsert(
+        reordered.map((z) => ({ id: z.id, sort_order: z.sort_order })),
+        { onConflict: "id" }
       );
+      if (error) {
+        toast.error("Не удалось сохранить порядок зон");
+        setZones(previous);
+        syncPending(previous);
+      }
     }
   }
 

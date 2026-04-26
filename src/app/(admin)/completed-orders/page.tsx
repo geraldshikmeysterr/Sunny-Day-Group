@@ -37,15 +37,19 @@ export default function CompletedOrdersPage() {
       if (!isAdmin && zoneIds.length > 0) q = q.in("delivery_zone_id", zoneIds);
       else if (isAdmin && cityFilter !== "all") q = q.eq("city_id", cityFilter);
       if (statusFilter !== "all") q = q.eq("status", statusFilter);
+      if (search.trim()) {
+        const safe = search.trim().replaceAll(/[%_\\]/g, String.raw`\$&`);
+        q = q.or(`id.ilike.%${safe}%,profiles.phone.ilike.%${safe}%`);
+      }
       const { data, count } = await q;
       setOrders(data??[]); setTotal(count??0);
     } catch { toast.error("Ошибка загрузки"); }
     finally { setLoading(false); }
-  }, [page, statusFilter, cityFilter, isAdmin, zoneIds]);
+  }, [page, statusFilter, cityFilter, isAdmin, zoneIds, search]);
 
   useEffect(() => { fetchOrders(); }, [fetchOrders]);
+  useEffect(() => { setPage(0); }, [statusFilter, cityFilter, search]);
 
-  const filtered = orders.filter(o => !search || o.profiles?.phone?.includes(search) || o.id.includes(search));
   const totalPages = Math.ceil(total/PAGE_SIZE);
   const cityOptions = [{ value: "all", label: "Все города" }, ...cities.map(c=>({value:c.id,label:c.name}))];
   const statusOptions = [{ value:"all", label:"Все статусы" }, {value:"delivered",label:"Доставлен"}, {value:"cancelled",label:"Отменён"}];
@@ -67,7 +71,7 @@ export default function CompletedOrdersPage() {
             <thead><tr><th>Заказ</th><th>Клиент</th>{isAdmin&&<th>Город</th>}<th>Адрес</th><th>Состав</th><th>Комментарий</th><th>Сумма</th><th>Статус</th><th>Оплата</th><th>Дата</th></tr></thead>
             <tbody>
               {loading&&Array.from({length:6},(_,i)=>i).map(i=><tr key={`sk-${i}`}>{Array.from({length:isAdmin?10:9},(_,j)=>j).map(j=><td key={`sk-col-${j}`}><div className="skeleton h-4"/></td>)}</tr>)}
-              {!loading&&filtered.map(order=>{
+              {!loading&&orders.map(order=>{
                 const c=ORDER_STATUS_COLORS[order.status as OrderStatus];
                 return(<tr key={order.id}>
                   <td className="w-px whitespace-nowrap font-mono text-xs font-bold">#{order.id.slice(0,8).toUpperCase()}</td>
@@ -82,7 +86,7 @@ export default function CompletedOrdersPage() {
                   <td className="w-px whitespace-nowrap text-xs text-neutral-400 num">{formatDateTime(order.created_at)}</td>
                 </tr>);
               })}
-              {!loading&&!filtered.length&&<tr><td colSpan={isAdmin?10:9} className="py-16 text-center text-neutral-400">Нет завершённых заказов</td></tr>}
+              {!loading&&!orders.length&&<tr><td colSpan={isAdmin?10:9} className="py-16 text-center text-neutral-400">Нет завершённых заказов</td></tr>}
             </tbody>
           </table>
         </div>
