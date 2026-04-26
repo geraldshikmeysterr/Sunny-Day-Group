@@ -14,6 +14,11 @@ type UserRow = {
   is_active?: boolean;
 };
 
+function getOpCityNames(zones: any[]): string | null {
+  const names = zones.map((oz: any) => oz.delivery_zones?.cities?.name).filter(Boolean);
+  return [...new Set<string>(names)].join(", ") || null;
+}
+
 export default function UsersPage() {
   const supabase = createClient();
   const [users, setUsers] = useState<UserRow[]>([]);
@@ -23,12 +28,12 @@ export default function UsersPage() {
   useEffect(() => {
     setLoading(true);
     Promise.all([
-      supabase.from("operators").select("id,full_name,email,is_active,created_at,cities(name)").order("created_at", { ascending: false }),
+      supabase.from("operators").select("id,full_name,email,is_active,created_at,operator_zones(delivery_zones(cities(name)))").order("created_at", { ascending: false }),
       supabase.from("admins").select("id,full_name,email,created_at").order("created_at", { ascending: false }),
     ]).then(([{ data: ops }, { data: adms }]) => {
       const operatorRows: UserRow[] = (ops ?? []).map((o: any) => ({
         id: o.id, full_name: o.full_name, email: o.email, created_at: o.created_at,
-        role: "operator", city: o.cities?.name ?? null, is_active: o.is_active,
+        role: "operator", city: getOpCityNames(o.operator_zones ?? []), is_active: o.is_active,
       }));
       const adminRows: UserRow[] = (adms ?? []).map((a: any) => ({
         id: a.id, full_name: a.full_name, email: a.email, created_at: a.created_at,
