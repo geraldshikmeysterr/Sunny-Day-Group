@@ -89,7 +89,7 @@ Port 6543 is NOT open publicly on the VPS firewall — accessible only through t
 - **Real-time:** Active orders page subscribes to `postgres_changes` for live order updates. Realtime must be enabled for the `orders` table in Supabase Dashboard → Database → Replication.
 - **Server vs Client:** Import from `lib/supabase/server.ts` in Server Components and `lib/supabase/client.ts` in Client Components (`'use client'`)
 - **Auth:** Email/password via Supabase Auth; session managed via cookies in middleware
-- **Self-hosted:** Supabase runs on VPS `VPS_IP_REDACTED`; public URL is `https://supabase.shilmeyster.ru`
+- **Self-hosted:** Supabase runs on a VPS; public URL is `https://supabase.shilmeyster.ru`
 - **RLS:** Row Level Security is enabled on all tables. Helper functions `is_admin()`, `operator_zone_ids()`, `operator_city_ids()` (SECURITY DEFINER) are used in all policies. Full policy definitions are in `rls_policies.sql`.
 
 ### MFA (TOTP)
@@ -188,25 +188,23 @@ All write operations on key tables are logged via `audit_trigger_fn()` (SECURITY
 `service_role` PostgreSQL role must have GRANT on all tables it touches (including `carousel_cards` and `audit_log`). If you add a new table accessed by server-side code using the service key, run: `GRANT ALL ON TABLE <table> TO service_role;`
 
 ### GoTrue Rate Limiting
-Configured in `VPS_DEPLOY_PATH/supabase/docker/docker-compose.yml` under the `auth` service:
+Configured in the Supabase Docker Compose file under the `auth` service:
 - `GOTRUE_RATE_LIMIT_EMAIL_SENT: "10"` — max 10 emails/hour
 - `GOTRUE_RATE_LIMIT_TOKEN_REFRESH: "150"` — max 150 token refreshes/hour
 - `GOTRUE_RATE_LIMIT_VERIFY: "30"` — max 30 verify attempts/hour
 
-To apply changes: `cd VPS_DEPLOY_PATH/supabase/docker && docker compose restart auth`
+To apply changes: restart the `auth` container in the Supabase Docker Compose stack.
 
 ### Images
 All menu item and carousel images are stored in self-hosted Supabase Storage at `https://supabase.shilmeyster.ru`. Do not reference external image domains — CSP `img-src` only allows `self`, `data:`, `blob:`, and `https://supabase.shilmeyster.ru`.
 
 ### Deployment
-- App runs in a **Docker container** (`admin-panel`) managed by Docker Compose at `VPS_DEPLOY_PATH/docker-compose.yml`
-- Build context is `VPS_APP_PATH` on the VPS
+- App runs in a **Docker container** (`admin-panel`) managed by Docker Compose on the VPS
 - **Caddy** proxies `https://admin.shilmeyster.ru` → `admin-panel:3000` and `https://supabase.shilmeyster.ru` → `kong:8000`
 - PM2 is present on the VPS but is NOT used for this app — changes via PM2 have no effect on the live site
-- Deploy workflow:
+- Deploy workflow (run on VPS):
   ```bash
-  cd VPS_DEPLOY_PATH
-  git -C VPS_APP_PATH pull
+  git -C <app-path> pull
   docker compose build admin-panel
   docker compose up -d admin-panel
   ```
@@ -216,7 +214,7 @@ All menu item and carousel images are stored in self-hosted Supabase Storage at 
 ```bash
 docker network connect supabase_docker_default caddy
 ```
-If Caddy is recreated, re-run this command. The Caddyfile is at `VPS_DEPLOY_PATH/Caddyfile` (mounted into the container). To reload after editing:
+If Caddy is recreated, re-run this command. To reload the Caddyfile after editing:
 ```bash
 docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile
 ```
@@ -227,4 +225,4 @@ Docker build cache accumulates over time. Check usage with `docker system df`. C
 ```bash
 docker builder prune -f
 ```
-This removes only build cache — running containers and images are not affected. VPS disk: 80 GB total; ~19 GB used after cleanup (April 2026).
+This removes only build cache — running containers and images are not affected.
