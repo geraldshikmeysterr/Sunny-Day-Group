@@ -38,6 +38,20 @@ const EMPTY_FORM = {
 const getTypeName = (name: string) =>
   name === "Мороженое / Замороженные" ? "Замороженная продукция" : name;
 
+async function compressImage(file: File): Promise<File> {
+  const bitmap = await createImageBitmap(file);
+  const maxDim = 800;
+  const scale = bitmap.width > maxDim || bitmap.height > maxDim
+    ? maxDim / Math.max(bitmap.width, bitmap.height)
+    : 1;
+  const canvas = document.createElement("canvas");
+  canvas.width  = Math.round(bitmap.width  * scale);
+  canvas.height = Math.round(bitmap.height * scale);
+  canvas.getContext("2d")!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  const blob = await new Promise<Blob>(res => canvas.toBlob(b => res(b!), "image/webp", 0.85));
+  return new File([blob], file.name.replace(/\.[^.]+$/, ".webp"), { type: "image/webp" });
+}
+
 function SortableItemRow({ item, onEdit, onDelete, onToggle }: Readonly<{
   item: MenuItem; onEdit: (i: MenuItem) => void;
   onDelete: (id: string) => void; onToggle: (i: MenuItem) => void;
@@ -509,7 +523,8 @@ export default function MenuEditorPage() {
                     if (!f) return;
                     const result = await validateImageFile(f);
                     if (!result.ok) { toast.error(result.error); e.target.value = ""; return; }
-                    setPhotoFile(f); setPhotoPreview(URL.createObjectURL(f));
+                    const compressed = await compressImage(f);
+                    setPhotoFile(compressed); setPhotoPreview(URL.createObjectURL(compressed));
                     setForm(p => ({ ...p, image_url: "" }));
                   }} />
               </div>

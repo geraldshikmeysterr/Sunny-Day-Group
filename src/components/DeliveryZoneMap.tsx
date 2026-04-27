@@ -376,6 +376,23 @@ const DeliveryZoneMap = forwardRef<DeliveryZoneMapHandle, Props>(function Delive
     });
   }, [restaurants, mapReady]);
 
+  // Recolor existing markers and preview when drawColor changes mid-draw.
+  useEffect(() => {
+    if (!mapReady || mode !== "draw") return;
+    const map = mapRef.current;
+    const ymaps = globalThis.ymaps;
+    if (!map || !ymaps) return;
+    const d = drawRef.current;
+    const color = drawColor ?? ORANGE;
+    d.markers.forEach((marker) => marker.options.set({ iconColor: color }));
+    if (d.preview && d.points.length >= 2) {
+      map.geoObjects.remove(d.preview);
+      d.preview = null;
+      d.previewType = null;
+      updateDrawPreview(ymaps, map, d, color);
+    }
+  }, [drawColor, mapReady, mode]);
+
   // Keyboard shortcuts (active only in draw mode).
   useEffect(() => {
     if (mode !== "draw") return;
