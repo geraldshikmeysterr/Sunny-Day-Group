@@ -417,7 +417,8 @@ export default function CitiesPage() {
                           return (
                             <span key={mt.id} className={cn(
                               "badge text-xs",
-                              isAvail ? "bg-success-50 text-success-700" : "bg-neutral-100 text-neutral-400 line-through"
+                              !isAvail ? "bg-neutral-100 text-neutral-400 line-through" :
+                              mt.slug === "frozen" ? "bg-cyan-50 text-cyan-700" : "bg-orange-50 text-orange-600"
                             )}>
                               {mt.slug === "frozen" ? "Заморозка" : "Готовые блюда"}
                             </span>

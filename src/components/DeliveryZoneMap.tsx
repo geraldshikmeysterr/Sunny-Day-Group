@@ -13,6 +13,7 @@ export type DeliveryZone = {
   geojson: ZoneGeoJSON;
   is_active: boolean;
   sort_order: number;
+  menu_type_slug?: string;
 };
 
 export type RestaurantMarker = {
@@ -28,10 +29,23 @@ type Props = {
   previewGeojson?: ZoneGeoJSON | null;
   initialGeojson?: ZoneGeoJSON | null;
   mode: "view" | "draw";
+  drawColor?: string;
   onPolygonComplete?: (geojson: ZoneGeoJSON) => void;
   onDrawCancel?: () => void;
   center?: [number, number];
 };
+
+const ORANGE = "#F57300";
+const TEAL   = "#0891B2";
+
+function zoneStrokeColor(zone: DeliveryZone): string {
+  if (!zone.is_active) return "#94a3b8";
+  return zone.menu_type_slug === "frozen" ? TEAL : ORANGE;
+}
+function zoneFillColor(zone: DeliveryZone): string {
+  if (!zone.is_active) return "#94a3b830";
+  return zone.menu_type_slug === "frozen" ? `${TEAL}30` : `${ORANGE}30`;
+}
 
 const DEFAULT_CENTER: [number, number] = [55.751244, 37.618423];
 const DEFAULT_ZOOM = 11;
@@ -83,9 +97,7 @@ type DrawState = {
   markers: any[];
 };
 
-// Updates the in-progress preview in place to avoid flicker during drag.
-// Falls back to remove+recreate only when the geometry type changes.
-function updateDrawPreview(ymaps: any, map: any, d: DrawState) {
+function updateDrawPreview(ymaps: any, map: any, d: DrawState, color: string) {
   const pts = d.points;
   const needsPolygon = pts.length >= 3;
   let targetType: DrawState["previewType"] = null;
@@ -106,19 +118,18 @@ function updateDrawPreview(ymaps: any, map: any, d: DrawState) {
   const opts = { interactivityModel: "default#transparent" };
   if (needsPolygon) {
     d.preview = new ymaps.Polygon([[...pts, pts[0]]], {}, {
-      ...opts, fillColor: "#F5730040", strokeColor: "#F57300", strokeWidth: 2,
+      ...opts, fillColor: `${color}40`, strokeColor: color, strokeWidth: 2,
     });
     d.previewType = "polygon";
   } else {
     d.preview = new ymaps.Polyline(pts, {}, {
-      ...opts, strokeColor: "#F57300", strokeWidth: 2, strokeStyle: "dash",
+      ...opts, strokeColor: color, strokeWidth: 2, strokeStyle: "dash",
     });
     d.previewType = "polyline";
   }
   map.geoObjects.add(d.preview);
 }
 
-// Returns squared distance from point p to segment [a, b] (all in [lat, lng]).
 function distToSegmentSq(p: [number, number], a: [number, number], b: [number, number]): number {
   const dx = b[0] - a[0], dy = b[1] - a[1];
   const lenSq = dx * dx + dy * dy;
@@ -127,8 +138,6 @@ function distToSegmentSq(p: [number, number], a: [number, number], b: [number, n
   return (p[0] - (a[0] + t * dx)) ** 2 + (p[1] - (a[1] + t * dy)) ** 2;
 }
 
-// Returns the index at which to splice a new point so it lands on the nearest edge.
-// With <2 points just appends; with ≥2 treats the path as a closed ring.
 function findInsertIndex(points: [number, number][], p: [number, number]): number {
   if (points.length < 2) return points.length;
   let minDist = Infinity;
@@ -140,7 +149,6 @@ function findInsertIndex(points: [number, number][], p: [number, number]): numbe
   return insertAt;
 }
 
-// Removes a specific marker (by reference) from the draw state.
 function removeMarkerAt(map: any, d: DrawState, dot: any): number {
   const idx = d.markers.indexOf(dot);
   if (idx === -1) return -1;
@@ -150,8 +158,6 @@ function removeMarkerAt(map: any, d: DrawState, dot: any): number {
   return d.points.length;
 }
 
-// Creates a draggable marker at insertAt position. Uses indexOf(dot) in the drag
-// handler so subsequent splices never break coordinate updates.
 function addDraggableMarker(
   ymaps: any,
   map: any,
@@ -160,15 +166,16 @@ function addDraggableMarker(
   hoveredRef: { current: any },
   insertAt: number,
   onDelete: (dot: any) => void,
+  color: string,
 ) {
   const dot = new ymaps.Placemark(coords, {}, {
-    preset: "islands#circleDotIcon", iconColor: "#F57300", draggable: true, cursor: "grab",
+    preset: "islands#circleDotIcon", iconColor: color, draggable: true, cursor: "grab",
   });
   dot.events.add("drag", () => {
     const idx = d.markers.indexOf(dot);
     if (idx !== -1) {
       d.points[idx] = dot.geometry.getCoordinates() as [number, number];
-      updateDrawPreview(ymaps, map, d);
+      updateDrawPreview(ymaps, map, d, color);
     }
   });
   dot.events.add("mouseenter", () => { hoveredRef.current = dot; });
@@ -184,7 +191,7 @@ export type DeliveryZoneMapHandle = {
 };
 
 const DeliveryZoneMap = forwardRef<DeliveryZoneMapHandle, Props>(function DeliveryZoneMap({
-  zones, restaurants, previewGeojson, initialGeojson, mode, onPolygonComplete, onDrawCancel, center,
+  zones, restaurants, previewGeojson, initialGeojson, mode, drawColor, onPolygonComplete, onDrawCancel, center,
 }, ref) {
   const apiKey = process.env.NEXT_PUBLIC_YANDEX_MAPS_KEY ?? "";
   const containerRef = useRef<HTMLDivElement>(null);
@@ -196,6 +203,8 @@ const DeliveryZoneMap = forwardRef<DeliveryZoneMapHandle, Props>(function Delive
   const modeRef = useRef(mode);
   modeRef.current = mode;
   const prevModeRef = useRef(mode);
+  const drawColorRef = useRef(drawColor ?? ORANGE);
+  drawColorRef.current = drawColor ?? ORANGE;
   const [pointCount, setPointCount] = useState(0);
   const [mapReady, setMapReady] = useState(false);
 
@@ -219,7 +228,6 @@ const DeliveryZoneMap = forwardRef<DeliveryZoneMapHandle, Props>(function Delive
     setPointCount(0);
   }, []);
 
-  // Deletes a specific marker, or the last one if none given.
   const deletePoint = useCallback((target?: any) => {
     const map = mapRef.current;
     const d = drawRef.current;
@@ -230,12 +238,11 @@ const DeliveryZoneMap = forwardRef<DeliveryZoneMapHandle, Props>(function Delive
     const newCount = removeMarkerAt(map, d, dot);
     if (newCount !== -1) {
       setPointCount(newCount);
-      updateDrawPreview(globalThis.ymaps, map, d);
+      updateDrawPreview(globalThis.ymaps, map, d, drawColorRef.current);
     }
   }, []);
 
-  // When mode transitions to "draw" and initialGeojson is provided, load the existing
-  // polygon vertices as draggable markers so the user edits rather than redraws from scratch.
+  // When mode transitions to "draw" and initialGeojson is provided, load existing vertices.
   useEffect(() => {
     const prev = prevModeRef.current;
     prevModeRef.current = mode;
@@ -248,12 +255,13 @@ const DeliveryZoneMap = forwardRef<DeliveryZoneMapHandle, Props>(function Delive
     clearDrawing();
     const pts = toYmaps(initialGeojson.coordinates[0].slice(0, -1));
     const d = drawRef.current;
+    const color = drawColorRef.current;
     pts.forEach((coords, i) => {
       d.points.push(coords);
-      addDraggableMarker(ymaps, map, coords, d, hoveredMarkerRef, i, deletePoint);
+      addDraggableMarker(ymaps, map, coords, d, hoveredMarkerRef, i, deletePoint, color);
     });
     setPointCount(d.points.length);
-    updateDrawPreview(ymaps, map, d);
+    updateDrawPreview(ymaps, map, d, color);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, mapReady]);
 
@@ -295,8 +303,8 @@ const DeliveryZoneMap = forwardRef<DeliveryZoneMapHandle, Props>(function Delive
           [toYmaps(zone.geojson.coordinates[0])],
           { hintContent: zone.name },
           {
-            fillColor: zone.is_active ? "#F5730030" : "#94a3b830",
-            strokeColor: zone.is_active ? "#F57300" : "#94a3b8",
+            fillColor: zoneFillColor(zone),
+            strokeColor: zoneStrokeColor(zone),
             strokeWidth: 2,
             interactivityModel: "default#transparent",
           }
@@ -307,11 +315,12 @@ const DeliveryZoneMap = forwardRef<DeliveryZoneMapHandle, Props>(function Delive
         if (modeRef.current !== "draw") return;
         const coords: [number, number] = e.get("coords");
         const d = drawRef.current;
+        const color = drawColorRef.current;
         const insertAt = findInsertIndex(d.points, coords);
         d.points.splice(insertAt, 0, coords);
         setPointCount(d.points.length);
-        addDraggableMarker(ymaps, map, coords, d, hoveredMarkerRef, insertAt, deletePoint);
-        updateDrawPreview(ymaps, map, d);
+        addDraggableMarker(ymaps, map, coords, d, hoveredMarkerRef, insertAt, deletePoint, color);
+        updateDrawPreview(ymaps, map, d, color);
       });
     });
 
@@ -330,10 +339,11 @@ const DeliveryZoneMap = forwardRef<DeliveryZoneMapHandle, Props>(function Delive
     if (previewRef.current) { map.geoObjects.remove(previewRef.current); previewRef.current = null; }
 
     if (previewGeojson) {
+      const color = drawColorRef.current;
       previewRef.current = new globalThis.ymaps.Polygon(
         [toYmaps(previewGeojson.coordinates[0])],
         { hintContent: "Зона" },
-        { fillColor: "#F5730040", strokeColor: "#F57300", strokeWidth: 2, interactivityModel: "default#transparent" }
+        { fillColor: `${color}40`, strokeColor: color, strokeWidth: 2, interactivityModel: "default#transparent" }
       );
       map.geoObjects.add(previewRef.current);
     }
@@ -370,10 +380,8 @@ const DeliveryZoneMap = forwardRef<DeliveryZoneMapHandle, Props>(function Delive
   useEffect(() => {
     if (mode !== "draw") return;
     const onKey = (e: KeyboardEvent) => {
-      // Don't intercept keys while the user is typing in a form field.
       const tag = (document.activeElement as HTMLElement | null)?.tagName?.toLowerCase() ?? "";
       if (tag === "input" || tag === "textarea" || tag === "select") return;
-
       if (e.key === "Escape") { handleCancel(); return; }
       if (e.key === "Backspace" || e.key === "Delete") {
         e.preventDefault();

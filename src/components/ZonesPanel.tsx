@@ -10,7 +10,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import {
   Plus, GripVertical, Edit2, Trash2, Eye, EyeOff,
-  Loader2, CheckCircle2, PenLine,
+  Loader2, CheckCircle2,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
@@ -22,6 +22,7 @@ export type FullZone = DeliveryZone & {
   delivery_fee: number;
   free_from: number | null;
   min_order: number;
+  menu_type_slug: string;
 };
 
 type ZoneForm = {
@@ -34,6 +35,7 @@ type ZoneForm = {
   opEmail: string;
   opPassword: string;
   showOpPw: boolean;
+  menu_type_slug: string;
 };
 
 type ZoneBase = {
@@ -44,11 +46,19 @@ type ZoneBase = {
   geojson: ZoneGeoJSON;
   is_active: boolean;
   sort_order: number;
+  menu_type_slug: string;
 };
+
+const ORANGE = "#F57300";
+const TEAL   = "#0891B2";
+
+function zoneDrawColor(slug: string): string {
+  return slug === "frozen" ? TEAL : ORANGE;
+}
 
 const EMPTY_FORM: ZoneForm = {
   id: null, name: "", delivery_fee: "0", free_from: "", min_order: "0", geojson: null,
-  opEmail: "", opPassword: "", showOpPw: false,
+  opEmail: "", opPassword: "", showOpPw: false, menu_type_slug: "ready_meals",
 };
 
 type Props = {
@@ -71,14 +81,17 @@ function ZoneRow({ zone, onEdit, onToggle, onDelete, deleting }: Readonly<{
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: zone.id });
 
+  const isFrozen = zone.menu_type_slug === "frozen";
+
   return (
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={cn(
-        "group flex items-center gap-2 px-3 py-2.5 rounded-lg border border-neutral-200 bg-white",
+        "group flex items-center gap-2 px-3 py-2.5 rounded-lg border-2 bg-white",
         isDragging && "shadow-lg opacity-80 z-10",
-        !zone.is_active && "opacity-60"
+        !zone.is_active && "opacity-60",
+        isFrozen ? "border-cyan-400" : "border-orange-400"
       )}
     >
       <button {...attributes} {...listeners} className="text-neutral-300 hover:text-neutral-400 cursor-grab active:cursor-grabbing touch-none">
@@ -101,6 +114,41 @@ function ZoneRow({ zone, onEdit, onToggle, onDelete, deleting }: Readonly<{
           {deleting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
         </button>
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// MenuTypeToggle — segmented control (Готовые блюда / Заморозка)
+// ---------------------------------------------------------------------------
+
+function MenuTypeToggle({ value, onChange }: Readonly<{ value: string; onChange: (v: string) => void }>) {
+  const isFrozen = value === "frozen";
+  return (
+    <div className="relative flex bg-neutral-200 rounded-xl overflow-hidden" style={{ height: "2.25rem" }}>
+      <div
+        className="absolute inset-y-0 rounded-xl pointer-events-none transition-all duration-200"
+        style={{
+          background: isFrozen ? TEAL : ORANGE,
+          left: 0,
+          width: "50%",
+          transform: isFrozen ? "translateX(100%)" : "translateX(0%)",
+        }}
+      />
+      <button
+        type="button"
+        onClick={() => onChange("ready_meals")}
+        className={cn("relative flex-1 h-full text-xs font-medium z-10 transition-colors", !isFrozen ? "text-white" : "text-neutral-600 hover:text-neutral-800")}
+      >
+        Готовые блюда
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange("frozen")}
+        className={cn("relative flex-1 h-full text-xs font-medium z-10 transition-colors", isFrozen ? "text-white" : "text-neutral-600 hover:text-neutral-800")}
+      >
+        Заморозка
+      </button>
     </div>
   );
 }
@@ -139,7 +187,7 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
     setLoading(true);
     const { data, error } = await supabase
       .from("delivery_zones")
-      .select("id, name, delivery_fee, free_from, min_order, geojson, is_active, sort_order")
+      .select("id, name, delivery_fee, free_from, min_order, geojson, is_active, sort_order, menu_type_slug")
       .eq("city_id", cityId)
       .order("sort_order")
       .order("created_at");
@@ -187,12 +235,12 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
       min_order: String(zone.min_order),
       geojson: zone.geojson,
       opEmail: "", opPassword: "", showOpPw: false,
+      menu_type_slug: zone.menu_type_slug ?? "ready_meals",
     };
     setForm(f);
     initialFormRef.current = f;
     setMapMode("view");
     setFormError("");
-    // Load current operator email for this zone
     supabase
       .from("operator_zones")
       .select("operators(email)")
@@ -217,7 +265,8 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
         form.delivery_fee !== init.delivery_fee ||
         form.min_order !== init.min_order ||
         form.free_from !== init.free_from ||
-        form.geojson !== init.geojson;
+        form.geojson !== init.geojson ||
+        form.menu_type_slug !== init.menu_type_slug;
       if (changed && !confirm("Есть несохранённые изменения. Закрыть без сохранения?")) return;
     }
     setForm(null);
@@ -308,7 +357,6 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
   async function saveZone() {
     if (!form) return;
 
-    // Auto-finalize polygon if still in draw mode (works for both new and edited zones)
     let currentForm = form;
     if (mapMode === "draw") {
       const geojson = mapRef.current?.completePolygon() ?? null;
@@ -328,6 +376,7 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
       geojson: currentForm.geojson!,
       is_active: true,
       sort_order: currentForm.id ? (zones.find((z) => z.id === currentForm.id)?.sort_order ?? 0) : zones.length,
+      menu_type_slug: currentForm.menu_type_slug,
     };
 
     const savedForm = { ...currentForm };
@@ -406,7 +455,10 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
 
   const mapZones: DeliveryZone[] = zones.map((z) => ({
     id: z.id, name: z.name, geojson: z.geojson, is_active: z.is_active, sort_order: z.sort_order,
+    menu_type_slug: z.menu_type_slug,
   }));
+
+  const currentDrawColor = form ? zoneDrawColor(form.menu_type_slug) : ORANGE;
 
   // ------------------------------------------------------------------
   // Render helpers
@@ -461,6 +513,16 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
             <p className="text-sm font-semibold text-neutral-700">
               {form.id ? "Редактировать зону" : "Новая зона"}
             </p>
+
+            {/* Menu type toggle */}
+            <div>
+              <p className="label mb-1.5">Тип меню</p>
+              <MenuTypeToggle
+                value={form.menu_type_slug}
+                onChange={(v) => setForm((p) => p && { ...p, menu_type_slug: v })}
+              />
+            </div>
+
             <div>
               <label htmlFor="zone-name" className="label">Название *</label>
               <input
@@ -549,7 +611,7 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
         )}
       </div>
 
-      {/* Right: map — aspect-square keeps it square regardless of modal dimensions */}
+      {/* Right: map */}
       <div className="aspect-square flex-shrink-0 p-3">
         <DeliveryZoneMap
           ref={mapRef}
@@ -559,6 +621,7 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
           previewGeojson={mapMode === "draw" ? null : (form?.geojson ?? null)}
           initialGeojson={form?.geojson ?? null}
           mode={mapMode}
+          drawColor={currentDrawColor}
           onPolygonComplete={handlePolygonComplete}
           onDrawCancel={() => setMapMode(form?.geojson ? "view" : "draw")}
         />
