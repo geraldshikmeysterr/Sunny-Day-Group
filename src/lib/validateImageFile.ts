@@ -1,4 +1,4 @@
-const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5 MB
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10 MB
 
 /** Validates file by reading magic bytes — not just extension or MIME type from OS */
 export async function validateImageFile(
