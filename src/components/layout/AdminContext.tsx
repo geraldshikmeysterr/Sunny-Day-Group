@@ -32,7 +32,7 @@ export function AdminProvider({ children }: Readonly<{ children: React.ReactNode
   useEffect(() => {
     if (userId === undefined) return;
     if (userId === null) {
-      setCtx({ isAdmin: false, zoneIds: [], cityIds: [], loaded: true });
+      setCtx({ isAdmin: false, zoneIds: [], cityIds: [], handlesFrozen: false, loaded: true });
       return;
     }
 
