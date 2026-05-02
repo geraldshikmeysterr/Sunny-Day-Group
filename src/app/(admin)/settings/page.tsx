@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { Shield, ShieldCheck, ShieldOff, Loader2, Key, Snowflake } from "lucide-react";
+import { Shield, ShieldCheck, ShieldOff, Loader2, Key } from "lucide-react";
 import { toast } from "sonner";
 import { useAdmin } from "@/components/layout/AdminContext";
 
@@ -174,12 +174,9 @@ export default function SettingsPage() {
 
       {isAdmin && (
         <div className="card p-5 space-y-4">
-          <div className="flex items-center gap-2">
-            <Snowflake size={16} className="text-cyan-500 shrink-0" />
-            <div>
-              <p className="text-sm text-neutral-700">Стоимость доставки заморозки</p>
-              <p className="text-xs text-neutral-400 mt-0.5">Единая глобальная стоимость для всех заказов заморозки</p>
-            </div>
+          <div>
+            <p className="text-sm text-neutral-700">Стоимость доставки заморозки</p>
+            <p className="text-xs text-neutral-400 mt-0.5">Единая глобальная стоимость для всех заказов заморозки</p>
           </div>
           {loading ? (
             <div className="skeleton h-10 rounded-xl" />
