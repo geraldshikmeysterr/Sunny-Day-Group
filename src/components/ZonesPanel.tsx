@@ -119,41 +119,6 @@ function ZoneRow({ zone, onEdit, onToggle, onDelete, deleting }: Readonly<{
 }
 
 // ---------------------------------------------------------------------------
-// MenuTypeToggle — segmented control (Готовые блюда / Заморозка)
-// ---------------------------------------------------------------------------
-
-function MenuTypeToggle({ value, onChange }: Readonly<{ value: string; onChange: (v: string) => void }>) {
-  const isFrozen = value === "frozen";
-  return (
-    <div className="relative flex bg-neutral-200 rounded-xl overflow-hidden" style={{ height: "2.25rem" }}>
-      <div
-        className="absolute inset-y-0 rounded-xl pointer-events-none transition-all duration-200"
-        style={{
-          background: isFrozen ? TEAL : ORANGE,
-          left: 0,
-          width: "50%",
-          transform: isFrozen ? "translateX(100%)" : "translateX(0%)",
-        }}
-      />
-      <button
-        type="button"
-        onClick={() => onChange("ready_meals")}
-        className={cn("relative flex-1 h-full text-xs font-medium z-10 transition-colors", !isFrozen ? "text-white" : "text-neutral-600 hover:text-neutral-800")}
-      >
-        Готовые блюда
-      </button>
-      <button
-        type="button"
-        onClick={() => onChange("frozen")}
-        className={cn("relative flex-1 h-full text-xs font-medium z-10 transition-colors", isFrozen ? "text-white" : "text-neutral-600 hover:text-neutral-800")}
-      >
-        Заморозка
-      </button>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // ZonesPanel
 // ---------------------------------------------------------------------------
 
@@ -513,15 +478,6 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
             <p className="text-sm font-semibold text-neutral-700">
               {form.id ? "Редактировать зону" : "Новая зона"}
             </p>
-
-            {/* Menu type toggle */}
-            <div>
-              <p className="label mb-1.5">Тип меню</p>
-              <MenuTypeToggle
-                value={form.menu_type_slug}
-                onChange={(v) => setForm((p) => p && { ...p, menu_type_slug: v })}
-              />
-            </div>
 
             <div>
               <label htmlFor="zone-name" className="label">Название *</label>
