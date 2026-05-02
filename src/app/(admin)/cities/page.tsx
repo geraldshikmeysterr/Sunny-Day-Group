@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import ZonesPanel, { type FullZone } from "@/components/ZonesPanel";
 
-type MenuType = { id: string; slug: string; name: string };
+type MenuType = { id: string; slug: string; name: string; is_global?: boolean };
 
 type CityMenuType = { menu_type_id: string; is_available: boolean };
 
@@ -141,18 +141,26 @@ function CityFormFields({ values, onChange, menuTypes }: {
           <p className="text-sm font-semibold text-neutral-700 mb-3">Типы меню</p>
           <div className="space-y-2">
             {menuTypes.map(mt => (
-              <label key={mt.id} className="flex items-center gap-2.5 text-sm cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={values.menuTypeAvailability[mt.id] ?? true}
-                  onChange={e => onChange("menuTypeAvailability", {
-                    ...values.menuTypeAvailability,
-                    [mt.id]: e.target.checked,
-                  })}
-                  className="w-4 h-4 rounded accent-brand-500"
-                />
-                <span className="text-neutral-700">{mt.name}</span>
-              </label>
+              mt.is_global ? (
+                <div key={mt.id} className="flex items-center gap-2.5 text-sm">
+                  <input type="checkbox" checked disabled className="w-4 h-4 rounded accent-brand-500 opacity-50 cursor-not-allowed" />
+                  <span className="text-neutral-400">{mt.name}</span>
+                  <span className="text-xs text-cyan-600 bg-cyan-50 px-1.5 py-0.5 rounded">Глобально</span>
+                </div>
+              ) : (
+                <label key={mt.id} className="flex items-center gap-2.5 text-sm cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={values.menuTypeAvailability[mt.id] ?? true}
+                    onChange={e => onChange("menuTypeAvailability", {
+                      ...values.menuTypeAvailability,
+                      [mt.id]: e.target.checked,
+                    })}
+                    className="w-4 h-4 rounded accent-brand-500"
+                  />
+                  <span className="text-neutral-700">{mt.name}</span>
+                </label>
+              )
             ))}
           </div>
         </div>
@@ -192,7 +200,7 @@ export default function CitiesPage() {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   useEffect(() => {
-    supabase.from("menu_types").select("id, slug, name").then(({ data }) => {
+    supabase.from("menu_types").select("id, slug, name, is_global").then(({ data }) => {
       setMenuTypes(data ?? []);
     });
   }, []);
@@ -241,10 +249,14 @@ export default function CitiesPage() {
       }
 
       try {
-        const { data: menuItems } = await supabase.from("menu_items").select("id").eq("is_global_active", true);
-        if (menuItems?.length) {
+        const { data: menuItems } = await supabase
+          .from("menu_items")
+          .select("id, categories(menu_types(is_global))")
+          .eq("is_global_active", true);
+        const cityItems = (menuItems ?? []).filter((i: any) => !i.categories?.menu_types?.is_global);
+        if (cityItems.length) {
           await supabase.from("city_menu_items").upsert(
-            menuItems.map(i => ({ city_id: newCity.id, menu_item_id: i.id, price: 0, is_available: true })),
+            cityItems.map(i => ({ city_id: newCity.id, menu_item_id: i.id, price: 0, is_available: true })),
             { onConflict: "city_id,menu_item_id" }
           );
         }

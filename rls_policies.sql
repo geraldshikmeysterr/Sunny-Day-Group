@@ -46,12 +46,18 @@ DROP POLICY IF EXISTS "orders_select" ON orders;
 CREATE POLICY "orders_select" ON orders FOR SELECT USING (
   is_admin()
   OR delivery_zone_id = ANY(operator_zone_ids())
+  OR (menu_type = 'frozen' AND EXISTS(
+    SELECT 1 FROM operators WHERE id = auth.uid() AND handles_frozen = true
+  ))
 );
 
 DROP POLICY IF EXISTS "orders_update" ON orders;
 CREATE POLICY "orders_update" ON orders FOR UPDATE USING (
   is_admin()
   OR delivery_zone_id = ANY(operator_zone_ids())
+  OR (menu_type = 'frozen' AND EXISTS(
+    SELECT 1 FROM operators WHERE id = auth.uid() AND handles_frozen = true
+  ))
 );
 
 -- Mobile app creates orders via create_order() RPC (SECURITY DEFINER).
@@ -60,6 +66,7 @@ DROP POLICY IF EXISTS "orders_insert" ON orders;
 CREATE POLICY "orders_insert" ON orders FOR INSERT WITH CHECK (
   is_admin()
   OR delivery_zone_id = ANY(operator_zone_ids())
+  OR menu_type = 'frozen'
 );
 
 DROP POLICY IF EXISTS "orders_delete" ON orders;
@@ -79,6 +86,11 @@ CREATE POLICY "profiles_select" ON profiles FOR SELECT USING (
   is_admin()
   OR id IN (
     SELECT DISTINCT user_id FROM orders WHERE delivery_zone_id = ANY(operator_zone_ids())
+  )
+  OR id IN (
+    SELECT DISTINCT user_id FROM orders WHERE menu_type = 'frozen' AND EXISTS(
+      SELECT 1 FROM operators WHERE id = auth.uid() AND handles_frozen = true
+    )
   )
   OR id = auth.uid()
 );
@@ -290,6 +302,11 @@ CREATE POLICY "order_items_select" ON order_items FOR SELECT USING (
   is_admin()
   OR order_id IN (
     SELECT id FROM orders WHERE delivery_zone_id = ANY(operator_zone_ids())
+  )
+  OR order_id IN (
+    SELECT id FROM orders WHERE menu_type = 'frozen' AND EXISTS(
+      SELECT 1 FROM operators WHERE id = auth.uid() AND handles_frozen = true
+    )
   )
 );
 

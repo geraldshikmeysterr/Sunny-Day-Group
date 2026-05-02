@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils";
 import { validateImageFile } from "@/lib/validateImageFile";
 import { toast } from "sonner";
 
-type MenuType = { id: string; slug: string; name: string };
+type MenuType = { id: string; slug: string; name: string; is_global: boolean };
 type Category = { id: string; name: string; menu_type_id: string; sort_order: number; is_active: boolean };
 type MenuItem = {
   id: string; category_id: string; name: string; description: string | null;
@@ -26,13 +26,13 @@ type MenuItem = {
   proteins: number | null; fats: number | null; carbs: number | null;
   image_url: string | null; is_global_active: boolean; sort_order: number;
   active_from: string | null; active_until: string | null;
-  box_quantity: number | null;
+  box_quantity: number | null; global_price: number | null;
 };
 
 const EMPTY_FORM = {
   name: "", description: "", weight_grams: "",
   calories: "", proteins: "", fats: "", carbs: "", image_url: "", is_global_active: false,
-  active_from: "10:00", active_until: "20:00", box_quantity: "",
+  active_from: "10:00", active_until: "20:00", box_quantity: "", global_price: "",
 };
 
 const getTypeName = (name: string) =>
@@ -333,6 +333,7 @@ export default function MenuEditorPage() {
       is_global_active: item.is_global_active,
       active_from: item.active_from ?? "", active_until: item.active_until ?? "",
       box_quantity: String(item.box_quantity ?? ""),
+      global_price: item.global_price != null ? String(item.global_price) : "",
     });
     setPhotoPreview(item.image_url); setPhotoFile(null);
     setModal({ open: true, item, catId: item.category_id });
@@ -355,6 +356,11 @@ export default function MenuEditorPage() {
         return;
       }
     }
+    const activeCat = categories.find(c => c.id === modal.catId);
+    const activeMenuType = menuTypes.find(t => t.id === activeCat?.menu_type_id);
+    const isGlobalType = activeMenuType?.is_global ?? false;
+
+    const globalPriceVal = form.global_price ? Number.parseFloat(form.global_price) : null;
     const payload = {
       name: form.name, description: form.description || null,
       weight_grams: form.weight_grams ? Number.parseInt(form.weight_grams) : null,
@@ -367,6 +373,7 @@ export default function MenuEditorPage() {
       active_from: form.active_from || null,
       active_until: form.active_until || null,
       box_quantity: form.box_quantity ? Number.parseInt(form.box_quantity) : null,
+      global_price: isGlobalType ? (globalPriceVal != null && globalPriceVal >= 0 ? globalPriceVal : null) : null,
     };
     if (modal.item) {
       await supabase.from("menu_items").update(payload).eq("id", modal.item.id);
@@ -377,7 +384,7 @@ export default function MenuEditorPage() {
         .insert({ ...payload, sort_order: items.filter(i => i.category_id === modal.catId).length })
         .select("id")
         .single();
-      if (newItem?.id) {
+      if (newItem?.id && !isGlobalType) {
         const { data: cities } = await supabase.from("cities").select("id");
         if (cities?.length) {
           await supabase.from("city_menu_items").upsert(
@@ -529,7 +536,30 @@ export default function MenuEditorPage() {
                   }} />
               </div>
               <div><label htmlFor="item-name" className="label">Название *</label><input id="item-name" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} className="input" placeholder="Название блюда" autoComplete="off" /></div>
-              <div><p className="label">Цена (руб.)</p><p className="text-xs text-neutral-400 -mt-0.5 mb-1">Устанавливается в разделе «По городам»</p></div>
+              {(() => {
+                const activeCat = categories.find(c => c.id === modal.catId);
+                const activeMenuType = menuTypes.find(t => t.id === activeCat?.menu_type_id);
+                return activeMenuType?.is_global ? (
+                  <div>
+                    <label htmlFor="item-global-price" className="label">Глобальная цена (руб.)</label>
+                    <div className="relative">
+                      <input
+                        id="item-global-price"
+                        type="number"
+                        min={0}
+                        value={form.global_price}
+                        onChange={e => setForm(p => ({ ...p, global_price: e.target.value }))}
+                        className="input pr-8"
+                        placeholder="0"
+                        style={{ appearance: "textfield", MozAppearance: "textfield" }}
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 text-sm pointer-events-none">₽</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div><p className="label">Цена (руб.)</p><p className="text-xs text-neutral-400 -mt-0.5 mb-1">Устанавливается в разделе «По городам»</p></div>
+                );
+              })()}
               <div><label htmlFor="item-desc" className="label">Описание</label><textarea id="item-desc" value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} rows={3} className="textarea" placeholder="Описание блюда" /></div>
               <div>
                 <p className="label mb-2">КБЖУ</p>

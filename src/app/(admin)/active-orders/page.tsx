@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { formatDateTime, ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, ALLOWED_TRANSITIONS } from "@/lib/utils";
 import { useAdmin } from "@/components/layout/AdminContext";
+import { Snowflake } from "lucide-react";
 import { RefreshCw, Search, Loader2, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { CustomSelect } from "@/components/CustomSelect";
@@ -12,7 +13,7 @@ const PAGE_SIZE = 25;
 const ACTIVE: OrderStatus[] = ["new", "confirmed", "preparing", "delivering"];
 
 export default function ActiveOrdersPage() {
-  const { isAdmin, zoneIds } = useAdmin() as any;
+  const { isAdmin, zoneIds, handlesFrozen } = useAdmin() as any;
   const supabase = createClient();
   const [orders, setOrders] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
@@ -32,12 +33,21 @@ export default function ActiveOrdersPage() {
     setLoading(true);
     try {
       let q = supabase.from("orders")
-        .select("id,status,total_amount,delivery_fee,comment,created_at,payment_status,profiles(phone,first_name),addresses(full_address,street,house,apartment),order_items(item_name,quantity,item_price),cities(name)", { count: "exact" })
+        .select("id,status,menu_type,total_amount,delivery_fee,comment,created_at,payment_status,profiles(phone,first_name),addresses(full_address,street,house,apartment),order_items(item_name,quantity,item_price),cities(name)", { count: "exact" })
         .in("status", ACTIVE)
         .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
         .order("created_at", { ascending: false });
-      if (!isAdmin && zoneIds.length > 0) q = q.in("delivery_zone_id", zoneIds);
-      else if (isAdmin && cityFilter !== "all") q = q.eq("city_id", cityFilter);
+      if (!isAdmin) {
+        if (handlesFrozen && zoneIds.length > 0) {
+          q = q.or(`delivery_zone_id.in.(${zoneIds.join(",")}),menu_type.eq.frozen`);
+        } else if (handlesFrozen) {
+          q = q.eq("menu_type", "frozen");
+        } else if (zoneIds.length > 0) {
+          q = q.in("delivery_zone_id", zoneIds);
+        }
+      } else if (cityFilter !== "all") {
+        q = q.eq("city_id", cityFilter);
+      }
       if (statusFilter !== "all") q = q.eq("status", statusFilter);
       if (search.trim()) {
         const safe = search.trim().replaceAll(/[%_\\]/g, String.raw`\$&`);
@@ -47,7 +57,7 @@ export default function ActiveOrdersPage() {
       setOrders(data ?? []); setTotal(count ?? 0);
     } catch { toast.error("Ошибка загрузки"); }
     finally { setLoading(false); }
-  }, [page, statusFilter, cityFilter, isAdmin, zoneIds, search]);
+  }, [page, statusFilter, cityFilter, isAdmin, zoneIds, handlesFrozen, search]);
 
   useEffect(() => { fetchOrders(); }, [fetchOrders]);
   useEffect(() => { setPage(0); }, [statusFilter, cityFilter, search]);
@@ -96,9 +106,9 @@ export default function ActiveOrdersPage() {
       <div className="card overflow-hidden">
         <div className="table-wrapper rounded-none border-0">
           <table className="table">
-            <thead><tr><th>Заказ</th><th>Клиент</th>{isAdmin && <th>Город</th>}<th>Адрес</th><th>Состав</th><th>Комментарий</th><th>Сумма</th><th>Статус</th><th>Дата</th><th></th></tr></thead>
+            <thead><tr><th>Заказ</th><th>Клиент</th>{isAdmin && <th>Город</th>}<th>Тип</th><th>Адрес</th><th>Состав</th><th>Комментарий</th><th>Сумма</th><th>Статус</th><th>Дата</th><th></th></tr></thead>
             <tbody>
-              {loading && Array.from({length:5},(_,i)=>i).map(i=><tr key={`sk-${i}`}>{Array.from({length:isAdmin?10:9},(_,j)=>j).map(j=><td key={`sk-col-${j}`}><div className="skeleton h-4 w-full"/></td>)}</tr>)}
+              {loading && Array.from({length:5},(_,i)=>i).map(i=><tr key={`sk-${i}`}>{Array.from({length:isAdmin?11:10},(_,j)=>j).map(j=><td key={`sk-col-${j}`}><div className="skeleton h-4 w-full"/></td>)}</tr>)}
               {!loading && orders.map(order => {
                 const c = ORDER_STATUS_COLORS[order.status as OrderStatus];
                 const nextStatus = ALLOWED_TRANSITIONS[order.status as OrderStatus].find(s => s !== "cancelled");
@@ -109,6 +119,11 @@ export default function ActiveOrdersPage() {
                     <td className="w-px whitespace-nowrap font-mono text-xs font-bold text-neutral-900">#{order.id.slice(0,8).toUpperCase()}</td>
                     <td className="w-px whitespace-nowrap"><p className="font-medium text-sm">{order.profiles?.phone??"—"}</p>{order.profiles?.first_name&&<p className="text-xs text-neutral-400">{order.profiles.first_name}</p>}</td>
                     {isAdmin && <td className="w-px whitespace-nowrap text-sm text-neutral-500">{order.cities?.name??"—"}</td>}
+                    <td className="w-px whitespace-nowrap">
+                      {order.menu_type==="frozen"
+                        ? <span className="badge text-xs bg-cyan-50 text-cyan-700"><Snowflake size={10} className="inline mr-0.5"/>Заморозка</span>
+                        : <span className="badge text-xs bg-orange-50 text-orange-600">Готовые</span>}
+                    </td>
                     <td className="text-xs text-neutral-600 whitespace-normal min-w-[180px]">{addr||"—"}</td>
                     <td className="text-xs text-neutral-500 whitespace-normal min-w-[200px]">{items||"—"}</td>
                     <td className="text-xs text-brand-500 italic whitespace-normal min-w-[140px]">{order.comment||"—"}</td>
@@ -119,7 +134,7 @@ export default function ActiveOrdersPage() {
                   </tr>
                 );
               })}
-              {!loading&&!orders.length&&<tr><td colSpan={isAdmin?10:9} className="py-16 text-center text-neutral-400">Нет активных заказов</td></tr>}
+              {!loading&&!orders.length&&<tr><td colSpan={isAdmin?11:10} className="py-16 text-center text-neutral-400">Нет активных заказов</td></tr>}
             </tbody>
           </table>
         </div>

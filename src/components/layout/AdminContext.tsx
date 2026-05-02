@@ -3,17 +3,18 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 type AdminCtx = {
-  isAdmin:  boolean;
-  zoneIds:  string[];
-  cityIds:  string[];
-  loaded:   boolean;
+  isAdmin:       boolean;
+  zoneIds:       string[];
+  cityIds:       string[];
+  handlesFrozen: boolean;
+  loaded:        boolean;
 };
 
-const Ctx = createContext<AdminCtx>({ isAdmin: false, zoneIds: [], cityIds: [], loaded: false });
+const Ctx = createContext<AdminCtx>({ isAdmin: false, zoneIds: [], cityIds: [], handlesFrozen: false, loaded: false });
 
 export function AdminProvider({ children }: Readonly<{ children: React.ReactNode }>) {
   const [userId, setUserId] = useState<string | null | undefined>(undefined);
-  const [ctx, setCtx] = useState<AdminCtx>({ isAdmin: false, zoneIds: [], cityIds: [], loaded: false });
+  const [ctx, setCtx] = useState<AdminCtx>({ isAdmin: false, zoneIds: [], cityIds: [], handlesFrozen: false, loaded: false });
 
   // Track auth state — NO DB calls inside the callback to avoid session-lock deadlock.
   useEffect(() => {
@@ -41,14 +42,14 @@ export function AdminProvider({ children }: Readonly<{ children: React.ReactNode
       const { data: admin } = await supabase
         .from("admins").select("id").eq("id", userId).maybeSingle();
       if (admin) {
-        setCtx({ isAdmin: true, zoneIds: [], cityIds: [], loaded: true });
+        setCtx({ isAdmin: true, zoneIds: [], cityIds: [], handlesFrozen: false, loaded: true });
         return;
       }
 
       const { data: op } = await supabase
-        .from("operators").select("id").eq("id", userId).maybeSingle();
+        .from("operators").select("id,handles_frozen").eq("id", userId).maybeSingle();
       if (!op) {
-        setCtx({ isAdmin: false, zoneIds: [], cityIds: [], loaded: true });
+        setCtx({ isAdmin: false, zoneIds: [], cityIds: [], handlesFrozen: false, loaded: true });
         return;
       }
 
@@ -62,7 +63,7 @@ export function AdminProvider({ children }: Readonly<{ children: React.ReactNode
         opZones?.map((z: any) => z.delivery_zones?.city_id).filter(Boolean) ?? []
       )] as string[];
 
-      setCtx({ isAdmin: false, zoneIds, cityIds, loaded: true });
+      setCtx({ isAdmin: false, zoneIds, cityIds, handlesFrozen: op.handles_frozen ?? false, loaded: true });
     }
 
     fetchRole();

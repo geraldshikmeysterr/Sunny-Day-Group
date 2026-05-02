@@ -1,8 +1,9 @@
 "use client";
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { Search } from "lucide-react";
+import { Search, Snowflake } from "lucide-react";
 import { formatDate, cn } from "@/lib/utils";
+import { useAdmin } from "@/components/layout/AdminContext";
 
 type UserRow = {
   id: string;
@@ -12,6 +13,7 @@ type UserRow = {
   role: "admin" | "operator";
   city?: string | null;
   is_active?: boolean;
+  handles_frozen?: boolean;
 };
 
 function getOpCityNames(zones: any[]): string | null {
@@ -21,19 +23,22 @@ function getOpCityNames(zones: any[]): string | null {
 
 export default function UsersPage() {
   const supabase = createClient();
+  const { isAdmin } = useAdmin();
   const [users, setUsers] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [toggling, setToggling] = useState<string | null>(null);
 
-  useEffect(() => {
+  function loadUsers() {
     setLoading(true);
-    Promise.all([
-      supabase.from("operators").select("id,full_name,email,is_active,created_at,operator_zones(delivery_zones(cities(name)))").order("created_at", { ascending: false }),
+    return Promise.all([
+      supabase.from("operators").select("id,full_name,email,is_active,handles_frozen,created_at,operator_zones(delivery_zones(cities(name)))").order("created_at", { ascending: false }),
       supabase.from("admins").select("id,full_name,email,created_at").order("created_at", { ascending: false }),
     ]).then(([{ data: ops }, { data: adms }]) => {
       const operatorRows: UserRow[] = (ops ?? []).map((o: any) => ({
         id: o.id, full_name: o.full_name, email: o.email, created_at: o.created_at,
-        role: "operator", city: getOpCityNames(o.operator_zones ?? []), is_active: o.is_active,
+        role: "operator", city: getOpCityNames(o.operator_zones ?? []),
+        is_active: o.is_active, handles_frozen: o.handles_frozen ?? false,
       }));
       const adminRows: UserRow[] = (adms ?? []).map((a: any) => ({
         id: a.id, full_name: a.full_name, email: a.email, created_at: a.created_at,
@@ -42,7 +47,22 @@ export default function UsersPage() {
       setUsers([...adminRows, ...operatorRows]);
       setLoading(false);
     });
-  }, []);
+  }
+
+  useEffect(() => { loadUsers(); }, []);
+
+  async function toggleFrozen(user: UserRow) {
+    if (!isAdmin || user.role !== "operator") return;
+    setToggling(user.id);
+    const newVal = !user.handles_frozen;
+    try {
+      const { error } = await supabase.from("operators").update({ handles_frozen: newVal }).eq("id", user.id);
+      if (error) throw error;
+      setUsers(p => p.map(u => u.id === user.id ? { ...u, handles_frozen: newVal } : u));
+    } catch {
+      // revert handled by not updating state
+    } finally { setToggling(null); }
+  }
 
   const filtered = users.filter(u =>
     !search ||
@@ -72,13 +92,14 @@ export default function UsersPage() {
               <th>Email</th>
               <th>Роль</th>
               <th>Город</th>
+              <th>Заморозка</th>
               <th>Статус</th>
               <th>Создан</th>
             </tr>
           </thead>
           <tbody>
             {loading && Array.from({ length: 4 }, (_, i) => i).map(i => (
-              <tr key={`sk-${i}`}>{Array.from({ length: 5 }, (_, j) => j).map(j => <td key={`sk-col-${j}`}><div className="skeleton h-4" /></td>)}</tr>
+              <tr key={`sk-${i}`}>{Array.from({ length: 6 }, (_, j) => j).map(j => <td key={`sk-col-${j}`}><div className="skeleton h-4" /></td>)}</tr>
             ))}
             {!loading && filtered.map(u => (
               <tr key={u.id}>
@@ -93,6 +114,33 @@ export default function UsersPage() {
                 </td>
                 <td className="text-sm text-neutral-500">{u.city ?? "—"}</td>
                 <td>
+                  {u.role === "operator" ? (
+                    isAdmin ? (
+                      <button
+                        onClick={() => toggleFrozen(u)}
+                        disabled={toggling === u.id}
+                        title={u.handles_frozen ? "Отключить заморозку" : "Включить заморозку"}
+                        className={cn(
+                          "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors border",
+                          u.handles_frozen
+                            ? "bg-cyan-50 text-cyan-700 border-cyan-200 hover:bg-cyan-100"
+                            : "bg-neutral-100 text-neutral-400 border-neutral-200 hover:bg-neutral-200",
+                          toggling === u.id && "opacity-50 cursor-wait"
+                        )}>
+                        <Snowflake size={12} />
+                        {u.handles_frozen ? "Да" : "Нет"}
+                      </button>
+                    ) : (
+                      <span className={cn("badge text-xs", u.handles_frozen ? "bg-cyan-50 text-cyan-700" : "bg-neutral-100 text-neutral-400")}>
+                        <Snowflake size={10} className="inline mr-1" />
+                        {u.handles_frozen ? "Да" : "Нет"}
+                      </span>
+                    )
+                  ) : (
+                    <span className="text-neutral-300 text-sm">—</span>
+                  )}
+                </td>
+                <td>
                   <span className={cn("badge text-xs", u.is_active ? "bg-success-50 text-success-700" : "bg-danger-50 text-danger-600")}>
                     {u.is_active ? "Активен" : "Неактивен"}
                   </span>
@@ -101,7 +149,7 @@ export default function UsersPage() {
               </tr>
             ))}
             {!loading && !filtered.length && (
-              <tr><td colSpan={5} className="py-16 text-center text-neutral-400">Пользователи не найдены</td></tr>
+              <tr><td colSpan={6} className="py-16 text-center text-neutral-400">Пользователи не найдены</td></tr>
             )}
           </tbody>
         </table>

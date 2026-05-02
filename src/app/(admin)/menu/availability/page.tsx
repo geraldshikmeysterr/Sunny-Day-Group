@@ -7,9 +7,9 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 type City     = { id: string; name: string; city_menu_types?: { menu_type_id: string; is_available: boolean }[] };
-type MenuType = { id: string; slug: string; name: string };
+type MenuType = { id: string; slug: string; name: string; is_global: boolean };
 type Category = { id: string; name: string; menu_type_id: string; sort_order: number };
-type Item     = { id: string; name: string; category_id: string; menu_type_id: string; weight_grams: number | null };
+type Item     = { id: string; name: string; category_id: string; menu_type_id: string; weight_grams: number | null; is_global_active: boolean; global_price: number | null };
 type Cell     = { is_available: boolean; price: number };
 type Matrix   = Record<string, Record<string, Cell>>; // matrix[item_id][city_id]
 
@@ -79,7 +79,7 @@ export default function AvailabilityPage() {
       supabase.from("cities").select("id,name,city_menu_types(menu_type_id,is_available)").order("name"),
       supabase.from("menu_types").select("*"),
       supabase.from("categories").select("id,name,menu_type_id,sort_order").eq("is_active", true).order("sort_order"),
-      supabase.from("menu_items").select("id,name,category_id,weight_grams,categories(menu_type_id)").eq("is_global_active", true).order("sort_order"),
+      supabase.from("menu_items").select("id,name,category_id,weight_grams,is_global_active,global_price,categories(menu_type_id)").order("sort_order"),
       supabase.from("city_menu_items").select("city_id,menu_item_id,price,is_available").range(0, 999),
       supabase.from("city_menu_items").select("city_id,menu_item_id,price,is_available").range(1000, 1999),
       supabase.from("city_menu_items").select("city_id,menu_item_id,price,is_available").range(2000, 2999),
@@ -88,7 +88,7 @@ export default function AvailabilityPage() {
     const cmiRes = { data: [...(cmi0.data ?? []), ...(cmi1.data ?? []), ...(cmi2.data ?? []), ...(cmi3.data ?? [])] };
 
     const cities = cityRes.data ?? [];
-    const types  = typeRes.data ?? [];
+    const types  = (typeRes.data ?? []) as MenuType[];
     setAllCities(cities);
     setMenuTypes(types);
     setCategories(catRes.data ?? []);
@@ -96,6 +96,8 @@ export default function AvailabilityPage() {
     const itemsData: Item[] = (itemRes.data ?? []).map((i: any) => ({
       id: i.id, name: i.name, category_id: i.category_id,
       weight_grams: i.weight_grams,
+      is_global_active: i.is_global_active,
+      global_price: i.global_price ?? null,
       menu_type_id: i.categories?.menu_type_id ?? "",
     }));
     setItems(itemsData);
@@ -109,7 +111,6 @@ export default function AvailabilityPage() {
     }
     setMatrix(m);
 
-    // Operator with exactly 1 city: auto-select it; 2+ cities: start empty (use filter)
     if (!isAdmin && opCityIds.length === 1) {
       setSelectedCities(new Set(opCityIds));
     } else {
@@ -129,6 +130,7 @@ export default function AvailabilityPage() {
     });
   }
 
+  // Per-city toggle (готовые блюда)
   async function toggleItem(itemId: string, cityId: string) {
     const cur    = matrix[itemId]?.[cityId];
     const newVal = cur ? !cur.is_available : true;
@@ -146,6 +148,7 @@ export default function AvailabilityPage() {
     } finally { setSaving(null); }
   }
 
+  // Per-city price (готовые блюда)
   async function savePrice(itemId: string, cityId: string) {
     const rubles = Number.parseFloat(priceInput.replace(",", "."));
     const price  = !priceInput.trim() || Number.isNaN(rubles) || rubles < 0 ? 0 : rubles;
@@ -161,14 +164,46 @@ export default function AvailabilityPage() {
     finally { setSaving(null); setEditing(null); }
   }
 
+  // Global toggle (заморозка)
+  async function toggleGlobalItem(itemId: string) {
+    const item = items.find(i => i.id === itemId);
+    if (!item) return;
+    const newVal = !item.is_global_active;
+    setItems(p => p.map(i => i.id === itemId ? { ...i, is_global_active: newVal } : i));
+    setSaving(itemId);
+    try {
+      await supabase.from("menu_items").update({ is_global_active: newVal }).eq("id", itemId);
+      toast.success(newVal ? "Блюдо включено" : "Блюдо скрыто");
+    } catch {
+      setItems(p => p.map(i => i.id === itemId ? { ...i, is_global_active: !newVal } : i));
+      toast.error("Ошибка");
+    } finally { setSaving(null); }
+  }
+
+  // Global price (заморозка)
+  async function saveGlobalPrice(itemId: string) {
+    const rubles = Number.parseFloat(priceInput.replace(",", "."));
+    const price  = !priceInput.trim() || Number.isNaN(rubles) || rubles < 0 ? null : rubles;
+    setSaving(`price_${itemId}_global`);
+    try {
+      await supabase.from("menu_items").update({ global_price: price }).eq("id", itemId);
+      setItems(p => p.map(i => i.id === itemId ? { ...i, global_price: price } : i));
+      toast.success(price != null ? `Цена: ${price} ₽` : "Цена сброшена");
+    } catch { toast.error("Ошибка"); }
+    finally { setSaving(null); setEditing(null); }
+  }
+
+  const activeTypeObj = menuTypes.find(t => t.id === activeType);
+  const isGlobalType  = activeTypeObj?.is_global ?? false;
+
   const citiesForType = allCities.filter(c => {
     const cmt = c.city_menu_types?.find(t => t.menu_type_id === activeType);
     return cmt ? cmt.is_available : true;
   });
   const visibleCities = citiesForType.filter(c => selectedCities.has(c.id));
 
-  const typeItems = items.filter(i => i.menu_type_id === activeType);
-  const visibleCats = categories.filter(c => c.menu_type_id === activeType);
+  const typeItems    = items.filter(i => i.menu_type_id === activeType && (isGlobalType || i.is_global_active));
+  const visibleCats  = categories.filter(c => c.menu_type_id === activeType);
 
   const grouped = visibleCats.map(cat => ({
     cat,
@@ -188,7 +223,7 @@ export default function AvailabilityPage() {
     <div className="p-6 space-y-5">
       <div>
         <h1 className="text-3xl font-bold text-neutral-900">По городам</h1>
-        <p className="text-sm text-neutral-500 mt-1">Управляйте доступностью и ценами для каждого города.</p>
+        <p className="text-sm text-neutral-500 mt-1">Управляйте доступностью и ценами.</p>
       </div>
 
       <div className="card p-4 flex flex-wrap gap-4 text-sm">
@@ -223,7 +258,7 @@ export default function AvailabilityPage() {
             className="input pl-8 text-sm" />
         </div>
 
-        {(isAdmin || opCityIds.length >= 2) && (
+        {!isGlobalType && (isAdmin || opCityIds.length >= 2) && (
           <FilterDropdown
             label="Города"
             options={isAdmin ? citiesForType : citiesForType.filter(c => opCityIds.includes(c.id))}
@@ -235,113 +270,214 @@ export default function AvailabilityPage() {
         )}
       </div>
 
-      {visibleCities.length === 0 ? (
-        <div className="card p-12 text-center text-neutral-400">
-          <p className="text-base font-medium mb-1">Выберите города</p>
-          <p className="text-sm">Используйте фильтр «Города» чтобы добавить колонки в таблицу</p>
-        </div>
-      ) : (
-        <div className="overflow-hidden rounded-2xl border border-neutral-200 shadow-card">
-          <div className="overflow-x-auto bg-white">
-            <table className="w-full text-sm border-collapse min-w-full">
-              <thead className="bg-neutral-50">
-                <tr className="border-b border-neutral-200">
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-neutral-500 min-w-64 sticky left-0 bg-neutral-50 z-10 border-r border-neutral-200">
-                    Блюдо / Базовая цена
-                  </th>
-                  {visibleCities.map(city => (
-                    <th key={city.id} className="px-3 py-3 text-center text-xs font-semibold text-neutral-500 min-w-40">
-                      {city.name}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {grouped.map(({ cat, items: catItems }) => (
-                  <React.Fragment key={cat.id}>
-                    <tr className="bg-neutral-50/80 border-b border-neutral-200">
-                      <td className="px-4 py-2 sticky left-0 bg-neutral-50/80 border-r border-neutral-200 z-10">
-                        <span className="text-xs font-bold uppercase tracking-wider text-neutral-500">{cat.name}</span>
-                      </td>
-                      {visibleCities.map(city => (
-                        <td key={city.id} className="px-3 py-1.5 text-center">
-                          <span className="text-neutral-300 text-xs">—</span>
-                        </td>
-                      ))}
-                    </tr>
-                    {catItems.map(item => (
-                      <tr key={item.id} className="border-b border-neutral-100 hover:bg-neutral-50/40 group">
-                        <td className="px-4 py-3 sticky left-0 bg-white group-hover:bg-neutral-50/60 border-r border-neutral-200 z-10 pl-8">
-                          <p className="font-medium text-neutral-800">{item.name}</p>
-                          {item.weight_grams && (
-                            <span className="text-xs text-neutral-400">{item.weight_grams} г</span>
-                          )}
-                        </td>
-                        {visibleCities.map(city => {
-                          const cell       = matrix[item.id]?.[city.id];
-                          const isAvail    = cell?.is_available ?? false;
-                          const hasPrice   = (cell?.price ?? 0) > 0;
-                          const isSaving   = saving === `${item.id}_${city.id}` || saving === `price_${item.id}_${city.id}`;
-                          const isEditing  = editing?.itemId === item.id && editing?.cityId === city.id;
-                          return (
-                            <td key={city.id} className="px-3 py-2 text-center">
-                              <div className="flex flex-col items-center gap-1">
-                                <button
-                                  onClick={() => toggleItem(item.id, city.id)}
-                                  disabled={!!saving}
-                                  title={isAvail ? "Скрыть" : "Включить"}
-                                  className={cn(
-                                    "w-7 h-7 rounded-lg border transition-all flex items-center justify-center",
-                                    isSaving && "opacity-50 cursor-wait",
-                                    cell && isAvail
-                                      ? (hasPrice ? "bg-success-50 border-success-200 hover:bg-success-100" : "bg-brand-50 border-brand-200 hover:bg-brand-100")
-                                      : "bg-neutral-100 border-neutral-300 hover:bg-neutral-200"
-                                  )}>
-                                  {isSaving
-                                    ? <Loader2 size={12} className="animate-spin text-neutral-400" />
-                                    : isAvail
-                                    ? <Check size={12} className={hasPrice ? "text-success-500" : "text-brand-500"} />
-                                    : <X size={12} className="text-neutral-400" />}
-                                </button>
-                                {cell && isAvail && (
-                                  isEditing ? (
-                                    <div className="flex gap-1 items-center">
-                                      <input autoFocus value={priceInput}
-                                        onChange={e => setPriceInput(e.target.value)}
-                                        onKeyDown={e => {
-                                          if (e.key === "Enter") { e.preventDefault(); savePrice(item.id, city.id); }
-                                          if (e.key === "Escape") setEditing(null);
-                                        }}
-                                        onBlur={e => {
-                                          if (!e.relatedTarget) setTimeout(() => setEditing(null), 150);
-                                        }}
-                                        placeholder="0"
-                                        className="w-16 text-xs border rounded px-1.5 py-0.5 text-center focus:border-brand-500 outline-none" />
-                                      <button onMouseDown={e => e.preventDefault()} onClick={() => savePrice(item.id, city.id)} className="text-success-500 hover:text-success-600"><Check size={12} /></button>
-                                    </div>
-                                  ) : (
-                                    <button
-                                      onClick={() => { setEditing({ itemId: item.id, cityId: city.id }); setPriceInput(hasPrice ? String(cell.price) : ""); }}
-                                      className="text-xs text-neutral-400 hover:text-brand-500 flex items-center gap-0.5">
-                                      {hasPrice
-                                        ? <span className="text-success-600 font-medium num">{cell.price} ₽</span>
-                                        : <span>+ цена</span>}
-                                      <Edit3 size={9} />
-                                    </button>
-                                  )
-                                )}
-                              </div>
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    ))}
-                  </React.Fragment>
-                ))}
-              </tbody>
-            </table>
+      {/* ── Глобальный режим (заморозка) ── */}
+      {isGlobalType ? (
+        grouped.length === 0 ? (
+          <div className="card p-12 text-center text-neutral-400">
+            <p className="text-base font-medium mb-1">Нет позиций</p>
+            <p className="text-sm">Добавьте блюда в разделе «Редактор меню»</p>
           </div>
-        </div>
+        ) : (
+          <div className="overflow-hidden rounded-2xl border border-neutral-200 shadow-card">
+            <div className="overflow-x-auto bg-white">
+              <table className="w-full text-sm border-collapse min-w-full">
+                <thead className="bg-neutral-50">
+                  <tr className="border-b border-neutral-200">
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-neutral-500 min-w-64 sticky left-0 bg-neutral-50 z-10 border-r border-neutral-200">
+                      Блюдо
+                    </th>
+                    <th className="px-3 py-3 text-center text-xs font-semibold text-neutral-500 min-w-40">
+                      Вкл / Выкл
+                    </th>
+                    <th className="px-3 py-3 text-center text-xs font-semibold text-neutral-500 min-w-40">
+                      Глобальная цена
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {grouped.map(({ cat, items: catItems }) => (
+                    <React.Fragment key={cat.id}>
+                      <tr className="bg-neutral-50/80 border-b border-neutral-200">
+                        <td className="px-4 py-2 sticky left-0 bg-neutral-50/80 border-r border-neutral-200 z-10" colSpan={3}>
+                          <span className="text-xs font-bold uppercase tracking-wider text-neutral-500">{cat.name}</span>
+                        </td>
+                      </tr>
+                      {catItems.map(item => {
+                        const isSaving  = saving === item.id || saving === `price_${item.id}_global`;
+                        const isEditing = editing?.itemId === item.id && editing?.cityId === "global";
+                        const hasPrice  = item.global_price != null && item.global_price > 0;
+                        return (
+                          <tr key={item.id} className={cn("border-b border-neutral-100 hover:bg-neutral-50/40 group", !item.is_global_active && "opacity-60")}>
+                            <td className="px-4 py-3 sticky left-0 bg-white group-hover:bg-neutral-50/60 border-r border-neutral-200 z-10 pl-8">
+                              <p className="font-medium text-neutral-800">{item.name}</p>
+                              {item.weight_grams && <span className="text-xs text-neutral-400">{item.weight_grams} г</span>}
+                            </td>
+                            <td className="px-3 py-2 text-center">
+                              <button
+                                onClick={() => toggleGlobalItem(item.id)}
+                                disabled={!!saving}
+                                title={item.is_global_active ? "Скрыть" : "Включить"}
+                                className={cn(
+                                  "w-7 h-7 rounded-lg border transition-all flex items-center justify-center mx-auto",
+                                  isSaving && "opacity-50 cursor-wait",
+                                  item.is_global_active
+                                    ? "bg-brand-50 border-brand-200 hover:bg-brand-100"
+                                    : "bg-neutral-100 border-neutral-300 hover:bg-neutral-200"
+                                )}>
+                                {isSaving
+                                  ? <Loader2 size={12} className="animate-spin text-neutral-400" />
+                                  : item.is_global_active
+                                  ? <Check size={12} className="text-brand-500" />
+                                  : <X size={12} className="text-neutral-400" />}
+                              </button>
+                            </td>
+                            <td className="px-3 py-2 text-center">
+                              {item.is_global_active && (
+                                isEditing ? (
+                                  <div className="flex gap-1 items-center justify-center">
+                                    <input autoFocus value={priceInput}
+                                      onChange={e => setPriceInput(e.target.value)}
+                                      onKeyDown={e => {
+                                        if (e.key === "Enter") { e.preventDefault(); saveGlobalPrice(item.id); }
+                                        if (e.key === "Escape") setEditing(null);
+                                      }}
+                                      onBlur={e => { if (!e.relatedTarget) setTimeout(() => setEditing(null), 150); }}
+                                      placeholder="0"
+                                      className="w-20 text-xs border rounded px-1.5 py-0.5 text-center focus:border-brand-500 outline-none" />
+                                    <button onMouseDown={e => e.preventDefault()} onClick={() => saveGlobalPrice(item.id)} className="text-success-500 hover:text-success-600"><Check size={12} /></button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    onClick={() => { setEditing({ itemId: item.id, cityId: "global" }); setPriceInput(hasPrice ? String(item.global_price) : ""); }}
+                                    className="text-xs text-neutral-400 hover:text-brand-500 flex items-center gap-0.5 mx-auto">
+                                    {hasPrice
+                                      ? <span className="text-success-600 font-medium num">{item.global_price} ₽</span>
+                                      : <span>+ цена</span>}
+                                    <Edit3 size={9} />
+                                  </button>
+                                )
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </React.Fragment>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )
+      ) : (
+        /* ── Режим по городам (готовые блюда) ── */
+        visibleCities.length === 0 ? (
+          <div className="card p-12 text-center text-neutral-400">
+            <p className="text-base font-medium mb-1">Выберите города</p>
+            <p className="text-sm">Используйте фильтр «Города» чтобы добавить колонки в таблицу</p>
+          </div>
+        ) : (
+          <div className="overflow-hidden rounded-2xl border border-neutral-200 shadow-card">
+            <div className="overflow-x-auto bg-white">
+              <table className="w-full text-sm border-collapse min-w-full">
+                <thead className="bg-neutral-50">
+                  <tr className="border-b border-neutral-200">
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-neutral-500 min-w-64 sticky left-0 bg-neutral-50 z-10 border-r border-neutral-200">
+                      Блюдо / Базовая цена
+                    </th>
+                    {visibleCities.map(city => (
+                      <th key={city.id} className="px-3 py-3 text-center text-xs font-semibold text-neutral-500 min-w-40">
+                        {city.name}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {grouped.map(({ cat, items: catItems }) => (
+                    <React.Fragment key={cat.id}>
+                      <tr className="bg-neutral-50/80 border-b border-neutral-200">
+                        <td className="px-4 py-2 sticky left-0 bg-neutral-50/80 border-r border-neutral-200 z-10">
+                          <span className="text-xs font-bold uppercase tracking-wider text-neutral-500">{cat.name}</span>
+                        </td>
+                        {visibleCities.map(city => (
+                          <td key={city.id} className="px-3 py-1.5 text-center">
+                            <span className="text-neutral-300 text-xs">—</span>
+                          </td>
+                        ))}
+                      </tr>
+                      {catItems.map(item => (
+                        <tr key={item.id} className="border-b border-neutral-100 hover:bg-neutral-50/40 group">
+                          <td className="px-4 py-3 sticky left-0 bg-white group-hover:bg-neutral-50/60 border-r border-neutral-200 z-10 pl-8">
+                            <p className="font-medium text-neutral-800">{item.name}</p>
+                            {item.weight_grams && (
+                              <span className="text-xs text-neutral-400">{item.weight_grams} г</span>
+                            )}
+                          </td>
+                          {visibleCities.map(city => {
+                            const cell      = matrix[item.id]?.[city.id];
+                            const isAvail   = cell?.is_available ?? false;
+                            const hasPrice  = (cell?.price ?? 0) > 0;
+                            const isSaving  = saving === `${item.id}_${city.id}` || saving === `price_${item.id}_${city.id}`;
+                            const isEditing = editing?.itemId === item.id && editing?.cityId === city.id;
+                            return (
+                              <td key={city.id} className="px-3 py-2 text-center">
+                                <div className="flex flex-col items-center gap-1">
+                                  <button
+                                    onClick={() => toggleItem(item.id, city.id)}
+                                    disabled={!!saving}
+                                    title={isAvail ? "Скрыть" : "Включить"}
+                                    className={cn(
+                                      "w-7 h-7 rounded-lg border transition-all flex items-center justify-center",
+                                      isSaving && "opacity-50 cursor-wait",
+                                      cell && isAvail
+                                        ? (hasPrice ? "bg-success-50 border-success-200 hover:bg-success-100" : "bg-brand-50 border-brand-200 hover:bg-brand-100")
+                                        : "bg-neutral-100 border-neutral-300 hover:bg-neutral-200"
+                                    )}>
+                                    {isSaving
+                                      ? <Loader2 size={12} className="animate-spin text-neutral-400" />
+                                      : isAvail
+                                      ? <Check size={12} className={hasPrice ? "text-success-500" : "text-brand-500"} />
+                                      : <X size={12} className="text-neutral-400" />}
+                                  </button>
+                                  {cell && isAvail && (
+                                    isEditing ? (
+                                      <div className="flex gap-1 items-center">
+                                        <input autoFocus value={priceInput}
+                                          onChange={e => setPriceInput(e.target.value)}
+                                          onKeyDown={e => {
+                                            if (e.key === "Enter") { e.preventDefault(); savePrice(item.id, city.id); }
+                                            if (e.key === "Escape") setEditing(null);
+                                          }}
+                                          onBlur={e => {
+                                            if (!e.relatedTarget) setTimeout(() => setEditing(null), 150);
+                                          }}
+                                          placeholder="0"
+                                          className="w-16 text-xs border rounded px-1.5 py-0.5 text-center focus:border-brand-500 outline-none" />
+                                        <button onMouseDown={e => e.preventDefault()} onClick={() => savePrice(item.id, city.id)} className="text-success-500 hover:text-success-600"><Check size={12} /></button>
+                                      </div>
+                                    ) : (
+                                      <button
+                                        onClick={() => { setEditing({ itemId: item.id, cityId: city.id }); setPriceInput(hasPrice ? String(cell.price) : ""); }}
+                                        className="text-xs text-neutral-400 hover:text-brand-500 flex items-center gap-0.5">
+                                        {hasPrice
+                                          ? <span className="text-success-600 font-medium num">{cell.price} ₽</span>
+                                          : <span>+ цена</span>}
+                                        <Edit3 size={9} />
+                                      </button>
+                                    )
+                                  )}
+                                </div>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </React.Fragment>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )
       )}
     </div>
   );

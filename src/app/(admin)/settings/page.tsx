@@ -1,15 +1,21 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { Shield, ShieldCheck, ShieldOff, Loader2, Key } from "lucide-react";
+import { Shield, ShieldCheck, ShieldOff, Loader2, Key, Snowflake } from "lucide-react";
 import { toast } from "sonner";
+import { useAdmin } from "@/components/layout/AdminContext";
 
 type Factor = { id: string; factor_type: string; status: string; friendly_name?: string };
 
 export default function SettingsPage() {
   const supabase = createClient();
+  const { isAdmin } = useAdmin();
   const [factors, setFactors] = useState<Factor[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const [frozenFee, setFrozenFee] = useState<number | null>(null);
+  const [frozenFeeInput, setFrozenFeeInput] = useState("");
+  const [savingFee, setSavingFee] = useState(false);
 
   const [enrolling, setEnrolling] = useState(false);
   const [factorId, setFactorId] = useState("");
@@ -25,14 +31,35 @@ export default function SettingsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await supabase.auth.mfa.listFactors();
-      setFactors(data?.totp ?? []);
+      const [{ data: factorsData }, { data: mt }] = await Promise.all([
+        supabase.auth.mfa.listFactors(),
+        supabase.from("menu_types").select("delivery_fee").eq("slug", "frozen").maybeSingle(),
+      ]);
+      setFactors(factorsData?.totp ?? []);
+      if (mt != null) {
+        setFrozenFee(mt.delivery_fee ?? 0);
+        setFrozenFeeInput(String(mt.delivery_fee ?? 0));
+      }
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  async function saveFrozenFee() {
+    const val = Number.parseFloat(frozenFeeInput.replace(",", "."));
+    const fee = Number.isNaN(val) || val < 0 ? 0 : val;
+    setSavingFee(true);
+    try {
+      const { error } = await supabase.from("menu_types").update({ delivery_fee: fee }).eq("slug", "frozen");
+      if (error) throw error;
+      setFrozenFee(fee);
+      setFrozenFeeInput(String(fee));
+      toast.success("Стоимость доставки заморозки сохранена");
+    } catch { toast.error("Ошибка сохранения"); }
+    finally { setSavingFee(false); }
+  }
 
   async function startEnroll() {
     setEnrolling(true);
@@ -144,6 +171,49 @@ export default function SettingsPage() {
         <h1 className="text-3xl font-bold text-neutral-900">Настройки</h1>
         <p className="text-sm text-neutral-500 mt-0.5">Управление безопасностью аккаунта</p>
       </div>
+
+      {isAdmin && (
+        <div className="card p-5 space-y-4">
+          <div className="flex items-center gap-2">
+            <Snowflake size={16} className="text-cyan-500 shrink-0" />
+            <div>
+              <p className="text-sm text-neutral-700">Стоимость доставки заморозки</p>
+              <p className="text-xs text-neutral-400 mt-0.5">Единая глобальная стоимость для всех заказов заморозки</p>
+            </div>
+          </div>
+          {loading ? (
+            <div className="skeleton h-10 rounded-xl" />
+          ) : (
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <input
+                  type="number"
+                  min={0}
+                  value={frozenFeeInput}
+                  onChange={e => setFrozenFeeInput(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && saveFrozenFee()}
+                  className="input w-36 pr-8"
+                  placeholder="0"
+                  style={{ appearance: "textfield", MozAppearance: "textfield" }}
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 text-sm pointer-events-none">₽</span>
+              </div>
+              <button
+                onClick={saveFrozenFee}
+                disabled={savingFee}
+                className="btn-primary btn-sm"
+              >
+                {savingFee ? <Loader2 size={14} className="animate-spin" /> : "Сохранить"}
+              </button>
+              {frozenFee !== null && (
+                <span className="text-xs text-neutral-400">
+                  Текущая: {frozenFee} ₽
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="card p-5 space-y-4">
         <div>
