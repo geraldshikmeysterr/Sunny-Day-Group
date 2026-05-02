@@ -3,7 +3,6 @@ import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Search, Snowflake } from "lucide-react";
 import { formatDate, cn } from "@/lib/utils";
-import { useAdmin } from "@/components/layout/AdminContext";
 
 type UserRow = {
   id: string;
@@ -11,23 +10,24 @@ type UserRow = {
   email: string | null;
   created_at: string;
   role: "admin" | "operator";
-  city?: string | null;
+  assignment: string | null;
   is_active?: boolean;
-  handles_frozen?: boolean;
 };
 
-function getOpCityNames(zones: any[]): string | null {
-  const names = zones.map((oz: any) => oz.delivery_zones?.cities?.name).filter(Boolean);
-  return [...new Set<string>(names)].join(", ") || null;
+function getAssignment(zones: any[], handlesFrozen: boolean): string | null {
+  const cities = zones.map((oz: any) => oz.delivery_zones?.cities?.name).filter(Boolean);
+  const unique = [...new Set<string>(cities)];
+  const cityStr = unique.join(", ");
+  if (handlesFrozen && !cityStr) return "frozen";
+  if (handlesFrozen) return `frozen+${cityStr}`;
+  return cityStr || null;
 }
 
 export default function UsersPage() {
   const supabase = createClient();
-  const { isAdmin } = useAdmin();
   const [users, setUsers] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [toggling, setToggling] = useState<string | null>(null);
 
   function loadUsers() {
     setLoading(true);
@@ -37,12 +37,13 @@ export default function UsersPage() {
     ]).then(([{ data: ops }, { data: adms }]) => {
       const operatorRows: UserRow[] = (ops ?? []).map((o: any) => ({
         id: o.id, full_name: o.full_name, email: o.email, created_at: o.created_at,
-        role: "operator", city: getOpCityNames(o.operator_zones ?? []),
-        is_active: o.is_active, handles_frozen: o.handles_frozen ?? false,
+        role: "operator",
+        assignment: getAssignment(o.operator_zones ?? [], o.handles_frozen ?? false),
+        is_active: o.is_active,
       }));
       const adminRows: UserRow[] = (adms ?? []).map((a: any) => ({
         id: a.id, full_name: a.full_name, email: a.email, created_at: a.created_at,
-        role: "admin", city: null, is_active: true,
+        role: "admin", assignment: null, is_active: true,
       }));
       setUsers([...adminRows, ...operatorRows]);
       setLoading(false);
@@ -50,19 +51,6 @@ export default function UsersPage() {
   }
 
   useEffect(() => { loadUsers(); }, []);
-
-  async function toggleFrozen(user: UserRow) {
-    if (!isAdmin || user.role !== "operator") return;
-    setToggling(user.id);
-    const newVal = !user.handles_frozen;
-    try {
-      const { error } = await supabase.from("operators").update({ handles_frozen: newVal }).eq("id", user.id);
-      if (error) throw error;
-      setUsers(p => p.map(u => u.id === user.id ? { ...u, handles_frozen: newVal } : u));
-    } catch {
-      // revert handled by not updating state
-    } finally { setToggling(null); }
-  }
 
   const filtered = users.filter(u =>
     !search ||
@@ -91,15 +79,14 @@ export default function UsersPage() {
             <tr>
               <th>Email</th>
               <th>Роль</th>
-              <th>Город</th>
-              <th>Заморозка</th>
+              <th className="w-full">Назначение</th>
               <th>Статус</th>
               <th>Создан</th>
             </tr>
           </thead>
           <tbody>
             {loading && Array.from({ length: 4 }, (_, i) => i).map(i => (
-              <tr key={`sk-${i}`}>{Array.from({ length: 6 }, (_, j) => j).map(j => <td key={`sk-col-${j}`}><div className="skeleton h-4" /></td>)}</tr>
+              <tr key={`sk-${i}`}>{Array.from({ length: 5 }, (_, j) => j).map(j => <td key={`sk-col-${j}`}><div className="skeleton h-4" /></td>)}</tr>
             ))}
             {!loading && filtered.map(u => (
               <tr key={u.id}>
@@ -112,30 +99,9 @@ export default function UsersPage() {
                     {u.role === "admin" ? "Администратор" : "Оператор"}
                   </span>
                 </td>
-                <td className="text-sm text-neutral-500">{u.city ?? "—"}</td>
                 <td>
                   {u.role === "operator" ? (
-                    isAdmin ? (
-                      <button
-                        onClick={() => toggleFrozen(u)}
-                        disabled={toggling === u.id}
-                        title={u.handles_frozen ? "Отключить заморозку" : "Включить заморозку"}
-                        className={cn(
-                          "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors border",
-                          u.handles_frozen
-                            ? "bg-cyan-50 text-cyan-700 border-cyan-200 hover:bg-cyan-100"
-                            : "bg-neutral-100 text-neutral-400 border-neutral-200 hover:bg-neutral-200",
-                          toggling === u.id && "opacity-50 cursor-wait"
-                        )}>
-                        <Snowflake size={12} />
-                        {u.handles_frozen ? "Да" : "Нет"}
-                      </button>
-                    ) : (
-                      <span className={cn("badge text-xs", u.handles_frozen ? "bg-cyan-50 text-cyan-700" : "bg-neutral-100 text-neutral-400")}>
-                        <Snowflake size={10} className="inline mr-1" />
-                        {u.handles_frozen ? "Да" : "Нет"}
-                      </span>
-                    )
+                    <AssignmentCell assignment={u.assignment} />
                   ) : (
                     <span className="text-neutral-300 text-sm">—</span>
                   )}
@@ -149,11 +115,34 @@ export default function UsersPage() {
               </tr>
             ))}
             {!loading && !filtered.length && (
-              <tr><td colSpan={6} className="py-16 text-center text-neutral-400">Пользователи не найдены</td></tr>
+              <tr><td colSpan={5} className="py-16 text-center text-neutral-400">Пользователи не найдены</td></tr>
             )}
           </tbody>
         </table>
       </div>
     </div>
   );
+}
+
+function AssignmentCell({ assignment }: Readonly<{ assignment: string | null }>) {
+  if (!assignment) return <span className="text-neutral-300 text-sm">—</span>;
+  if (assignment === "frozen") {
+    return (
+      <span className="badge text-xs bg-cyan-50 text-cyan-700">
+        <Snowflake size={10} className="inline mr-1" />Замороженная продукция
+      </span>
+    );
+  }
+  if (assignment.startsWith("frozen+")) {
+    const cities = assignment.slice(7);
+    return (
+      <div className="flex flex-wrap gap-1 items-center">
+        <span className="badge text-xs bg-cyan-50 text-cyan-700">
+          <Snowflake size={10} className="inline mr-1" />Заморозка
+        </span>
+        <span className="text-sm text-neutral-500">{cities}</span>
+      </div>
+    );
+  }
+  return <span className="text-sm text-neutral-500">{assignment}</span>;
 }

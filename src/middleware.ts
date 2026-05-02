@@ -8,6 +8,7 @@ const ADMIN_ONLY_ROUTES = [
   "/cities",
   "/promos",
   "/users",
+  "/frozen",
 ];
 
 function buildCsp(nonce: string): string {

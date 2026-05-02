@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   ShoppingBag, CheckCircle2, UtensilsCrossed, Building2,
-  MapPin, Ticket, Users, UserCog, LogOut, ChevronRight, Calendar, LayoutList, Settings,
+  MapPin, Ticket, Users, UserCog, LogOut, ChevronRight, Calendar, LayoutList, Settings, Snowflake,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAdmin } from "@/components/layout/AdminContext";
@@ -28,6 +28,7 @@ const NAV = [
     { href: "/clients",     label: "Гости",      icon: Users,     roles: ["superadmin","operator"] },
   ]},
   { title: "Система", items: [
+    { href: "/frozen",    label: "Заморозка",    icon: Snowflake, roles: ["superadmin"] },
     { href: "/users",     label: "Пользователи", icon: UserCog,  roles: ["superadmin"] },
     { href: "/settings",  label: "Настройки",    icon: Settings, roles: ["superadmin", "operator"] },
   ]},
