@@ -363,9 +363,9 @@ const DeliveryZoneMap = forwardRef<DeliveryZoneMapHandle, Props>(function Delive
         { hintContent: r.address, balloonContent: r.address },
         {
           iconLayout: "default#image",
-          iconImageHref: "/Label.jfif",
-          iconImageSize: [40, 52],
-          iconImageOffset: [-20, -52],
+          iconImageHref: "/label.png",
+          iconImageSize: [44, 42],
+          iconImageOffset: [-22, -42],
           interactivityModel: "default#opaque",
         }
       );
