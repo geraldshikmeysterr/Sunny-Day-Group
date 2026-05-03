@@ -16,14 +16,13 @@ type FrozenOperator = {
 export default function FrozenPage() {
   const supabase = createClient();
 
-  const [frozenFee, setFrozenFee] = useState(0);
   const [frozenFeeInput, setFrozenFeeInput] = useState("");
   const [savingFee, setSavingFee] = useState(false);
 
   const [operators, setOperators] = useState<FrozenOperator[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [form, setForm] = useState({ email: "", password: "", full_name: "" });
+  const [form, setForm] = useState({ email: "", password: "" });
   const [creating, setCreating] = useState(false);
   const [showForm, setShowForm] = useState(false);
 
@@ -36,7 +35,7 @@ export default function FrozenPage() {
         supabase.from("menu_types").select("delivery_fee").eq("slug", "frozen").maybeSingle(),
         supabase.from("operators").select("id,full_name,email,is_active,created_at").eq("handles_frozen", true).order("created_at", { ascending: false }),
       ]);
-      if (mt) { setFrozenFee(mt.delivery_fee ?? 0); setFrozenFeeInput(String(mt.delivery_fee ?? 0)); }
+      if (mt) { setFrozenFeeInput(String(mt.delivery_fee ?? 0)); }
       setOperators(ops ?? []);
     } finally { setLoading(false); }
   }, []);
@@ -50,7 +49,6 @@ export default function FrozenPage() {
     try {
       const { error } = await supabase.from("menu_types").update({ delivery_fee: fee }).eq("slug", "frozen");
       if (error) throw error;
-      setFrozenFee(fee);
       setFrozenFeeInput(String(fee));
       toast.success("Стоимость доставки сохранена");
     } catch { toast.error("Ошибка сохранения"); }
@@ -60,7 +58,6 @@ export default function FrozenPage() {
   async function createOperator() {
     const email = form.email.trim().toLowerCase();
     const password = form.password;
-    const full_name = form.full_name.trim() || null;
 
     if (!email || !password) { toast.error("Заполните email и пароль"); return; }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { toast.error("Некорректный email"); return; }
@@ -70,7 +67,6 @@ export default function FrozenPage() {
 
     setCreating(true);
     try {
-      // Check if operator with this email already exists
       const { data: existing } = await supabase
         .from("operators").select("id,handles_frozen").eq("email", email).maybeSingle();
 
@@ -82,13 +78,12 @@ export default function FrozenPage() {
           if (error) throw error;
           toast.success("Существующему оператору назначена заморозка");
           await load();
-          setForm({ email: "", password: "", full_name: "" });
+          setForm({ email: "", password: "" });
           setShowForm(false);
         }
         return;
       }
 
-      // Create new operator via Edge Function (same as ZonesPanel)
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Нет сессии");
       const res = await fetch(
@@ -105,13 +100,11 @@ export default function FrozenPage() {
       );
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? "Ошибка создания");
-      const opId: string = body.operator.id;
-      // Set full_name and handles_frozen
-      await supabase.from("operators").update({ handles_frozen: true, ...(full_name ? { full_name } : {}) }).eq("id", opId);
+      await supabase.from("operators").update({ handles_frozen: true }).eq("id", body.operator.id);
 
       toast.success("Оператор создан");
       await load();
-      setForm({ email: "", password: "", full_name: "" });
+      setForm({ email: "", password: "" });
       setShowForm(false);
     } catch (e: any) { toast.error(e.message); }
     finally { setCreating(false); }
@@ -132,7 +125,7 @@ export default function FrozenPage() {
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-5">
       <div>
-        <h1 className="text-3xl font-normal text-neutral-900">Замороженная продукция</h1>
+        <h1 className="text-3xl font-bold text-neutral-900">Замороженная продукция</h1>
         <p className="text-sm text-neutral-500 mt-0.5">Настройки доставки и операторы заморозки</p>
       </div>
 
@@ -161,7 +154,6 @@ export default function FrozenPage() {
             <button onClick={saveFee} disabled={savingFee} className="btn-primary btn-sm">
               {savingFee ? <Loader2 size={14} className="animate-spin" /> : "Сохранить"}
             </button>
-            <span className="text-xs text-neutral-400">Текущая: {frozenFee} ₽</span>
           </div>
         )}
       </div>
@@ -180,7 +172,7 @@ export default function FrozenPage() {
 
         {showForm && (
           <div className="px-5 py-4 border-b border-neutral-100 bg-neutral-50 space-y-3">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="label">Email *</label>
                 <input
@@ -199,20 +191,12 @@ export default function FrozenPage() {
                   autoComplete="new-password"
                 />
               </div>
-              <div>
-                <label className="label">Имя</label>
-                <input
-                  type="text" value={form.full_name}
-                  onChange={e => setForm(p => ({ ...p, full_name: e.target.value }))}
-                  className="input text-sm" placeholder="Необязательно"
-                />
-              </div>
             </div>
             <div className="flex gap-2">
               <button onClick={createOperator} disabled={creating} className="btn-primary btn-sm">
                 {creating ? <Loader2 size={14} className="animate-spin" /> : "Создать"}
               </button>
-              <button onClick={() => { setShowForm(false); setForm({ email: "", password: "", full_name: "" }); }} className="btn-secondary btn-sm">
+              <button onClick={() => { setShowForm(false); setForm({ email: "", password: "" }); }} className="btn-secondary btn-sm">
                 Отмена
               </button>
             </div>

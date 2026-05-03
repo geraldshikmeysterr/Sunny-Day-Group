@@ -140,9 +140,9 @@ function AssignmentCell({ assignment }: Readonly<{ assignment: string | null }>)
         <span className="badge text-xs bg-cyan-50 text-cyan-700">
           <Snowflake size={10} className="inline mr-1" />Заморозка
         </span>
-        <span className="text-sm text-neutral-500">{cities}</span>
+        <span className="text-sm text-neutral-800">{cities}</span>
       </div>
     );
   }
-  return <span className="text-sm text-neutral-500">{assignment}</span>;
+  return <span className="text-sm text-neutral-800">{assignment}</span>;
 }

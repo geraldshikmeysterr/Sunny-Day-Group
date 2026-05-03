@@ -1,6 +1,7 @@
 import { Sidebar } from "@/components/layout/Sidebar";
 import { AuthGuard } from "@/components/layout/AuthGuard";
 import { AdminProvider } from "@/components/layout/AdminContext";
+import { Toaster } from "sonner";
 
 export default function AdminLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
@@ -12,6 +13,7 @@ export default function AdminLayout({ children }: Readonly<{ children: React.Rea
             {children}
           </main>
         </div>
+        <Toaster richColors position="top-right" />
       </AdminProvider>
     </AuthGuard>
   );
