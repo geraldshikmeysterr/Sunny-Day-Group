@@ -187,7 +187,7 @@ export default function FrozenPage() {
                 <input
                   type="password" value={form.password}
                   onChange={e => setForm(p => ({ ...p, password: e.target.value }))}
-                  className="input text-sm" placeholder="Мин. 1 заглавная + 1 цифра"
+                  className="input text-sm" placeholder="Пароль *"
                   autoComplete="new-password"
                 />
               </div>

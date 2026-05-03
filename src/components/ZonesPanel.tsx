@@ -230,8 +230,7 @@ export default function ZonesPanel({ cityId, pendingZones, onPendingChange }: Re
         form.delivery_fee !== init.delivery_fee ||
         form.min_order !== init.min_order ||
         form.free_from !== init.free_from ||
-        form.geojson !== init.geojson ||
-        form.menu_type_slug !== init.menu_type_slug;
+        form.geojson !== init.geojson;
       if (changed && !confirm("Есть несохранённые изменения. Закрыть без сохранения?")) return;
     }
     setForm(null);
