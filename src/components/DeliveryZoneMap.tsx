@@ -357,17 +357,15 @@ const DeliveryZoneMap = forwardRef<DeliveryZoneMapHandle, Props>(function Delive
     restaurantMarkersRef.current.forEach((m) => map.geoObjects.remove(m));
     restaurantMarkersRef.current = [];
 
-    const RestaurantLayout = globalThis.ymaps.templateLayoutFactory.createClass(
-      '<div style="width:20px;height:20px;background:#C2185B;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,0.35)"><div style="width:6px;height:6px;background:#fff;border-radius:50%"></div></div>'
-    );
     (restaurants ?? []).forEach((r) => {
       const marker = new globalThis.ymaps.Placemark(
         [r.lat, r.lng],
         { hintContent: r.address, balloonContent: r.address },
         {
-          iconLayout: RestaurantLayout,
-          iconShape: { type: "Circle", coordinates: [0, 0], radius: 10 },
-          iconImageOffset: [-10, -10],
+          iconLayout: "default#image",
+          iconImageHref: "/Label.jfif",
+          iconImageSize: [40, 52],
+          iconImageOffset: [-20, -52],
           interactivityModel: "default#opaque",
         }
       );
