@@ -23,7 +23,7 @@ app/
 ├── page.tsx                # Redirects to /active-orders
 ├── login/                  # Public auth page (with MFA step)
 └── (admin)/                # Route group — all protected admin pages
-    ├── layout.tsx           # Wraps all admin pages with Sidebar + AuthGuard + AdminProvider
+    ├── layout.tsx           # Wraps all admin pages with Sidebar + AuthGuard + AdminProvider + Toaster
     ├── active-orders/       # Real-time order board (new → preparing → on_the_way → ready_for_pickup)
     ├── completed-orders/    # Order history
     ├── menu-editor/         # Menu item CRUD with drag-and-drop (@dnd-kit)
@@ -33,7 +33,8 @@ app/
     ├── clients/             # Guest management
     ├── restaurants/         # Restaurant management
     ├── promos/              # Promo codes
-    ├── users/               # Admin user management
+    ├── frozen/              # Frozen food — delivery fee + frozen operator management (superadmin only)
+    ├── users/               # Admin user management (read-only view of all operators/admins)
     └── settings/            # MFA (TOTP) management — available to all roles
 ```
 
@@ -54,7 +55,7 @@ Two roles stored in Supabase DB:
 | `src/lib/supabase/client.ts` | Browser Supabase client (for client components) |
 | `src/lib/supabase/server.ts` | Server Supabase client with cookies (for server components / middleware) |
 | `src/lib/utils.ts` | `cn()`, `formatPrice()`, `OrderStatus` type, status label/color mappings |
-| `src/lib/validateImageFile.ts` | Magic-byte MIME validation for uploads (JPEG/PNG/WebP, max 5 MB) |
+| `src/lib/validateImageFile.ts` | Magic-byte MIME validation for uploads (JPEG/PNG/WebP, max 10 MB) |
 | `src/middleware.ts` | Auth check, nonce-based CSP (`strict-dynamic`), superadmin-only route enforcement |
 | `src/components/layout/AdminContext.tsx` | Role + cityId context provider |
 | `src/components/layout/Sidebar.tsx` | Nav with role-based link filtering |
@@ -92,6 +93,22 @@ Port 6543 is NOT open publicly on the VPS firewall — accessible only through t
 - **Self-hosted:** Supabase runs on a VPS; public URL is `https://supabase.shilmeyster.ru`
 - **RLS:** Row Level Security is enabled on all tables. Helper functions `is_admin()`, `operator_zone_ids()`, `operator_city_ids()` (SECURITY DEFINER) are used in all policies. Full policy definitions are in `rls_policies.sql`.
 
+### Frozen Food (Замороженная продукция)
+
+`menu_types` table has two extra columns added for the frozen type:
+- `is_global boolean` — `true` for the `frozen` slug; means the menu type is available without a city
+- `delivery_fee numeric` — global delivery cost for frozen orders
+
+`operators` table has `handles_frozen boolean` — marks operators who process frozen orders.
+
+The `/frozen` page (superadmin only) manages:
+1. Global delivery fee → reads/writes `menu_types.delivery_fee` where `slug = 'frozen'`
+2. Frozen operators → reads `operators` where `handles_frozen = true`; creates via the `create-operator` Edge Function then sets `handles_frozen = true`; removal sets `handles_frozen = false`
+
+`city_menu_types` table still exists and is used by `/menu/availability` (per-city menu toggle) and `/promos` (city-scoped promo filtering). It is NOT used to manage the frozen type — frozen is global.
+
+Zone `menu_type_slug` is stored in `delivery_zones` and used only for display (cyan border for frozen zones in ZonesPanel). The field is a passthrough — it is read from DB and written back unchanged. There is no UI to change it when editing a zone.
+
 ### MFA (TOTP)
 
 All users can enroll/unenroll TOTP via `/settings`. Login page shows a 6-digit code step when AAL2 is required.
@@ -124,7 +141,7 @@ Custom Tailwind classes defined in `globals.css` `@layer components`:
 
 Brand colors: orange `#F57300` (primary), sun yellow `#FFE32B`, leaf green `#3E8719`. Typography: Inter (body) + Yanone Kaffeesatz (headings/display).
 
-For heading elements (`<h1>`, `<h2>`, etc.) always set `font-normal` explicitly — browsers apply bold by default and Tailwind's reset may not override it in all cases. Prefer `<p>` over `<h2>` for section labels that should look like body text.
+Page `<h1>` elements use `font-bold text-3xl`. Section label `<p>` elements use `font-medium text-sm text-neutral-700`. Prefer `<p>` over `<h2>` for section labels — avoids browser bold default interference.
 
 ### UI Patterns
 
@@ -136,6 +153,9 @@ To push columns right (Hours, Status, Actions), put `className="w-full"` directl
 
 **Square map containers**
 Use `aspect-square flex-shrink-0` on the map wrapper. When the parent is a flex row with `h-full`, this makes width = height. Widen the modal accordingly: `max-w-[calc(88vh+520px)]` for city edit modals that contain a square map.
+
+**Toast notifications**
+`<Toaster richColors position="top-right" />` is mounted once in `src/app/(admin)/layout.tsx`. Do NOT add another Toaster in individual pages — one instance covers the entire admin app.
 
 ### DeliveryZoneMap Component
 
@@ -158,6 +178,90 @@ NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 ```
 
+## Mobile App Phone Auth (Flash Call)
+
+The mobile app (React Native + Expo) uses phone number verification via flash call — provider calls the user's number and hangs up; user enters the last 4 digits of the caller ID as OTP.
+
+**Provider:** RedSMS (`cp.redsms.ru`)
+
+### Edge Functions (deployed on VPS)
+
+Both functions live at `/root/n8n-install/supabase/docker/volumes/functions/`:
+
+| Function | Purpose |
+|----------|---------|
+| `send-flash-call/index.ts` | Initiates flash call via RedSMS, stores hashed OTP in `otp_codes` |
+| `verify-flash-call/index.ts` | Verifies entered code, creates/gets Supabase Auth user, returns session |
+| `create-operator/index.ts` | Creates an operator auth user; called from ZonesPanel and /frozen page |
+
+**Endpoints (public, no auth header required):**
+```
+POST https://supabase.shilmeyster.ru/functions/v1/send-flash-call
+POST https://supabase.shilmeyster.ru/functions/v1/verify-flash-call
+```
+
+**`create-operator` requires auth:**
+```
+POST https://supabase.shilmeyster.ru/functions/v1/create-operator
+Headers: Authorization: Bearer <access_token>, apikey: <anon_key>
+Body: { operator_email, operator_password }
+Response: { operator: { id, email } }
+```
+
+### send-flash-call
+
+Request: `{ "phone": "+79XXXXXXXXX" }`
+
+Response: `{ "ok": true }`
+
+Logic:
+- Validates phone format (`+7XXXXXXXXXX`)
+- Rate limit: max 3 requests per phone per 10 minutes (checked against `otp_codes`)
+- Generates 4-digit code, calls RedSMS API (`route: "fcall"`)
+- Hashes code: `SHA-256(code + phone + PHONE_AUTH_SECRET)` before storing
+- Invalidates previous unused codes for the phone, inserts new record into `otp_codes`
+
+**RedSMS auth headers:** `login`, `ts` (Unix timestamp), `secret = MD5(ts + REDSMS_API_KEY)`
+
+### verify-flash-call
+
+Request: `{ "phone": "+79XXXXXXXXX", "code": "1234" }`
+
+Response: `{ "access_token": "...", "refresh_token": "...", "user": { "id": "uuid", "phone": "+7..." } }`
+
+Logic:
+- Hashes entered code same way, looks up in `otp_codes` (unused, not expired)
+- Marks code as used
+- Creates Supabase Auth user if not exists — synthetic email `{digits}@phone.internal` + deterministic password `SHA-256(phone + PHONE_AUTH_SECRET + "v1")`
+- If user exists: updates password (deterministic, same formula)
+- Signs in via `signInWithPassword` → returns real Supabase session tokens
+
+### Database Tables
+
+**`otp_codes`** — RLS enabled, no policies (service role only):
+- `id` uuid, `phone` text, `code` text (hashed), `created_at`, `expires_at` (default +10min), `used` bool
+
+**`profiles`** — mobile app user profiles:
+- `id` uuid (= auth.uid), `phone` text, `first_name`, `last_name`, `middle_name`, `email`, `gender`, `city_id`, `created_at`, `updated_at`
+
+### Environment Variables on VPS
+
+Set in `/root/n8n-install/supabase/docker/.env` and passed to the `functions` service in `docker-compose.yml`:
+```
+REDSMS_API_KEY=...
+REDSMS_LOGIN=...
+PHONE_AUTH_SECRET=...   # 64-char hex secret, used for all HMAC/hash operations
+```
+
+### Redeploying Edge Functions
+
+```bash
+# On VPS, from /root/n8n-install/supabase/docker/
+docker compose --env-file .env up -d --no-deps --force-recreate functions
+```
+
+`docker restart functions` does NOT pick up env var changes — use `--force-recreate`.
+
 ## Security Model
 
 ### Middleware (`src/middleware.ts`)
@@ -166,14 +270,14 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 - Redirects unauthenticated users to `/login`
 - Enforces superadmin-only routes by querying the `admins` table in DB:
   ```
-  ADMIN_ONLY_ROUTES = ["/menu-editor", "/menu/schedule", "/carousel", "/cities", "/promos", "/users"]
+  ADMIN_ONLY_ROUTES = ["/menu-editor", "/menu/schedule", "/carousel", "/cities", "/promos", "/users", "/frozen"]
   ```
   Operators hitting these routes are redirected to `/active-orders`.
 
 ### Input Validation Rules
-- **Image uploads** (`carousel`, `menu-editor`): validated via magic bytes using `src/lib/validateImageFile.ts`; accept only `image/jpeg,image/png,image/webp`, max 5 MB
+- **Image uploads** (`carousel`, `menu-editor`): validated via magic bytes using `src/lib/validateImageFile.ts`; accept only `image/jpeg,image/png,image/webp`, max 10 MB
 - **PostgREST search** (`clients`): escape `%`, `_`, `*`, `\` before passing to `.ilike()` to prevent wildcard injection
-- **Operator credentials** (`cities`): email format regex + password must contain ≥1 uppercase letter and ≥1 digit
+- **Operator credentials** (`cities`, `frozen`): email format regex + password must contain ≥1 uppercase letter and ≥1 digit (enforced in both ZonesPanel and frozen/page.tsx)
 
 ### Supabase RLS
 All tables have RLS enabled. Helper functions:

@@ -5,7 +5,7 @@ export async function validateImageFile(
   file: File
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (file.size > MAX_IMAGE_SIZE) {
-    return { ok: false, error: "Файл слишком большой (максимум 5 МБ)" };
+    return { ok: false, error: "Файл слишком большой (максимум 10 МБ)" };
   }
 
   const bytes = new Uint8Array(await file.slice(0, 12).arrayBuffer());
