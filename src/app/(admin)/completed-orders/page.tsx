@@ -80,7 +80,7 @@ export default function CompletedOrdersPage() {
                   <td className="text-xs text-neutral-600 whitespace-normal min-w-[180px]">{(order.addresses?.full_address ?? `${order.addresses?.street??""} ${order.addresses?.house??""}`.trim()) || "—"}</td>
                   <td className="text-xs text-neutral-500 whitespace-normal min-w-[200px]">{order.order_items?.map((i:any)=>`${i.item_name} ×${i.quantity}`).join(", ")||"—"}</td>
                   <td className="text-xs text-brand-500 italic whitespace-normal min-w-[140px]">{order.comment||"—"}</td>
-                  <td className="w-px whitespace-nowrap num font-semibold">{((order.total_amount??0)/100).toLocaleString("ru-RU")} ₽</td>
+                  <td className="w-px whitespace-nowrap num font-semibold">{Number(order.total_amount??0).toLocaleString("ru-RU")} ₽</td>
                   <td className="w-px whitespace-nowrap"><span className={`badge ${c.bg} ${c.text}`}><span className={`w-1.5 h-1.5 rounded-full ${c.dot}`}/>{ORDER_STATUS_LABELS[order.status as OrderStatus]}</span></td>
                   <td className="w-px whitespace-nowrap"><span className={`badge text-xs ${order.payment_status==="paid"?"bg-success-50 text-success-700":"bg-neutral-100 text-neutral-500"}`}>{order.payment_status==="paid"?"Оплачен":order.payment_status==="refunded"?"Возврат":"—"}</span></td>
                   <td className="w-px whitespace-nowrap text-xs text-neutral-400 num">{formatDateTime(order.created_at)}</td>

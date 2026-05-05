@@ -127,7 +127,7 @@ export default function ActiveOrdersPage() {
                     <td className="text-xs text-neutral-600 whitespace-normal min-w-[180px]">{addr||"—"}</td>
                     <td className="text-xs text-neutral-500 whitespace-normal min-w-[200px]">{items||"—"}</td>
                     <td className="text-xs text-brand-500 italic whitespace-normal min-w-[140px]">{order.comment||"—"}</td>
-                    <td className="w-px whitespace-nowrap num"><p className="font-semibold">{((order.total_amount??0)/100).toLocaleString("ru-RU")} ₽</p>{order.delivery_fee>0&&<p className="text-xs text-neutral-400">+{(order.delivery_fee/100).toLocaleString("ru-RU")} ₽</p>}</td>
+                    <td className="w-px whitespace-nowrap num"><p className="font-semibold">{Number(order.total_amount??0).toLocaleString("ru-RU")} ₽</p>{order.delivery_fee>0&&<p className="text-xs text-neutral-400">+{Number(order.delivery_fee).toLocaleString("ru-RU")} ₽</p>}</td>
                     <td className="w-px whitespace-nowrap"><span className={`badge ${c.bg} ${c.text}`}><span className={`w-1.5 h-1.5 rounded-full ${c.dot}`}/>{ORDER_STATUS_LABELS[order.status as OrderStatus]}</span></td>
                     <td className="w-px whitespace-nowrap text-xs text-neutral-400 num">{formatDateTime(order.created_at)}</td>
                     <td className="w-px whitespace-nowrap">{nextStatus&&<button onClick={()=>advance(order.id,nextStatus)} disabled={updating===order.id} className="btn-ghost btn-sm text-brand-500 border border-brand-200 hover:bg-brand-50 whitespace-nowrap">{updating===order.id?<Loader2 size={12} className="animate-spin"/>:<ArrowRight size={12}/>}{ORDER_STATUS_LABELS[nextStatus]}</button>}</td>
