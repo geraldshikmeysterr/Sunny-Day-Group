@@ -193,8 +193,7 @@ export default function AvailabilityPage() {
     finally { setSaving(null); setEditing(null); }
   }
 
-  const activeTypeObj = menuTypes.find(t => t.id === activeType);
-  const isGlobalType  = activeTypeObj?.is_global ?? false;
+  const isGlobalType  = false; // always use per-city mode; is_global is a mobile-app concept only
 
   const citiesForType = allCities.filter(c => {
     const cmt = c.city_menu_types?.find(t => t.menu_type_id === activeType);
