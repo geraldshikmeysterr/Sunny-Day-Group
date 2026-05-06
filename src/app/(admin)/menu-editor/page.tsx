@@ -532,10 +532,13 @@ export default function MenuEditorPage() {
                 const activeCat = categories.find(c => c.id === modal.catId);
                 const activeMenuType = menuTypes.find(t => t.id === activeCat?.menu_type_id);
                 return activeMenuType?.is_global ? (
-                  <div>
-                    <label htmlFor="item-weight" className="label">Вес (г)</label>
-                    <input id="item-weight" type="number" placeholder="Вес блюда" value={form.weight_grams} onChange={e => setForm(p => ({ ...p, weight_grams: e.target.value }))} className="input" />
-                  </div>
+                  <>
+                    <div><p className="label">Цена (руб.)</p><p className="text-xs text-neutral-400 -mt-0.5 mb-1">Устанавливается в разделе «Доступность»</p></div>
+                    <div>
+                      <label htmlFor="item-weight" className="label">Вес (г)</label>
+                      <input id="item-weight" type="number" placeholder="Вес блюда" value={form.weight_grams} onChange={e => setForm(p => ({ ...p, weight_grams: e.target.value }))} className="input" />
+                    </div>
+                  </>
                 ) : (
                   <>
                     <div><p className="label">Цена (руб.)</p><p className="text-xs text-neutral-400 -mt-0.5 mb-1">Устанавливается в разделе «По городам»</p></div>
