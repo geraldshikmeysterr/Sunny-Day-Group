@@ -271,7 +271,10 @@ export default function PromosPage() {
                         <label htmlFor="promo-discount" className="label">{form.promo_type==="percent"?"Размер (%)":"Сумма (₽)"} *</label>
                         <input id="promo-discount" type="number" value={form.discount_value} onChange={e=>setForm((p:any)=>({...p,discount_value:e.target.value}))} className="input" placeholder="0" autoComplete="off"/>
                       </div>
-                    : null
+                    : <div>
+                        <p className="label">Тип меню</p>
+                        <CustomSelect value={form.menu_type_scope} onChange={v=>setForm((p:any)=>({...p,menu_type_scope:v,city_id:"",item_ids:[]}))} options={MENU_TYPE_SCOPE_OPTIONS}/>
+                      </div>
                 }
               </div>
 
