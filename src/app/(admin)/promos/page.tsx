@@ -8,7 +8,7 @@ import { CustomSelect } from "@/components/CustomSelect";
 
 const EMPTY = {
   code:"", description:"", promo_type:"percent", discount_value:"",
-  promo_scope:"order", menu_type_scope:"both",
+  promo_scope:"order", menu_type_scope:"ready_meals",
   min_order_amount:"", max_uses:"", valid_from:"", valid_until:"",
   city_id:"", is_active:false,
   item_ids:[] as string[], category_ids:[] as string[],
@@ -17,7 +17,7 @@ const EMPTY = {
 
 const TYPE_LABELS: Record<string,string> = {
   percent:"Скидка %", fixed:"Скидка ₽", set_price:"Фикс. цена", free_delivery:"Бесплат. доставка",
-  buy_n_get_m:"N+M=?",
+  buy_n_get_m:"Купи N, получи M",
 };
 const SCOPE_LABELS: Record<string,string> = {
   order:"На заказ", item:"На блюда", category:"На категорию",
@@ -31,7 +31,6 @@ function promoSizeLabel(p: any): string {
 }
 
 const MENU_TYPE_SCOPE_OPTIONS = [
-  { value: "both",        label: "Готовые и замороженные" },
   { value: "ready_meals", label: "Готовые блюда" },
   { value: "frozen",      label: "Замороженная продукция" },
 ];
@@ -189,7 +188,7 @@ export default function PromosPage() {
   // ── Options ─────────────────────────────────────────────────────────────────
   const filtered       = promos.filter(p=>!search||p.code.toLowerCase().includes(search.toLowerCase())||(p.description??"").toLowerCase().includes(search.toLowerCase()));
   const statusOptions  = [{value:"all",label:"Все статусы"},{value:"active",label:"Активные"},{value:"inactive",label:"Неактивные"}];
-  const typeOptions    = [{value:"percent",label:"Скидка в %"},{value:"fixed",label:"Скидка в ₽"},{value:"set_price",label:"Фиксированная цена"},{value:"free_delivery",label:"Бесплатная доставка"},{value:"buy_n_get_m",label:"Купи N, получи M (1+1=3)"}];
+  const typeOptions    = [{value:"percent",label:"Скидка в %"},{value:"fixed",label:"Скидка в ₽"},{value:"set_price",label:"Фиксированная цена"},{value:"free_delivery",label:"Бесплатная доставка"},{value:"buy_n_get_m",label:"Купи N, получи M"}];
   const scopeOptions   = [{value:"order",label:"На весь заказ"},{value:"item",label:"На конкретные блюда"},{value:"category",label:"На категорию"}];
   const cityOptions    = [{value:"",label:"Все города"},...filteredCities.map(c=>({value:c.id,label:c.name}))];
 

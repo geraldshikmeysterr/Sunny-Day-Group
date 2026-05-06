@@ -55,7 +55,7 @@ export function CustomSelect({ value, onChange, options, className, placeholder 
           "input text-left flex items-center justify-between gap-2 cursor-pointer w-full",
           open && "border-brand-500 ring-2 ring-brand-500/20"
         )}>
-        <span className={selected ? "text-neutral-900" : "text-neutral-400"}>
+        <span className={cn("truncate min-w-0", selected ? "text-neutral-900" : "text-neutral-400")}>
           {selected?.label ?? placeholder ?? "Выберите..."}
         </span>
         <ChevronDown size={14} className={cn("shrink-0 text-neutral-400 transition-transform", open && "rotate-180")} />
