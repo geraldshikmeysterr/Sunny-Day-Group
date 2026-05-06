@@ -193,7 +193,8 @@ export default function AvailabilityPage() {
     finally { setSaving(null); setEditing(null); }
   }
 
-  const isGlobalType  = false; // always use per-city mode; is_global is a mobile-app concept only
+  const activeTypeObj = menuTypes.find(t => t.id === activeType);
+  const isGlobalType  = activeTypeObj?.is_global ?? false;
 
   const citiesForType = allCities.filter(c => {
     const cmt = c.city_menu_types?.find(t => t.menu_type_id === activeType);
@@ -286,10 +287,7 @@ export default function AvailabilityPage() {
                       Блюдо
                     </th>
                     <th className="px-3 py-3 text-center text-xs font-semibold text-neutral-500 min-w-40">
-                      Вкл / Выкл
-                    </th>
-                    <th className="px-3 py-3 text-center text-xs font-semibold text-neutral-500 min-w-40">
-                      Глобальная цена
+                      Вкл / Цена
                     </th>
                   </tr>
                 </thead>
@@ -297,7 +295,7 @@ export default function AvailabilityPage() {
                   {grouped.map(({ cat, items: catItems }) => (
                     <React.Fragment key={cat.id}>
                       <tr className="bg-neutral-50/80 border-b border-neutral-200">
-                        <td className="px-4 py-2 sticky left-0 bg-neutral-50/80 border-r border-neutral-200 z-10" colSpan={3}>
+                        <td className="px-4 py-2 sticky left-0 bg-neutral-50/80 border-r border-neutral-200 z-10" colSpan={2}>
                           <span className="text-xs font-bold uppercase tracking-wider text-neutral-500">{cat.name}</span>
                         </td>
                       </tr>
@@ -312,50 +310,50 @@ export default function AvailabilityPage() {
                               {item.weight_grams && <span className="text-xs text-neutral-400">{item.weight_grams} г</span>}
                             </td>
                             <td className="px-3 py-2 text-center">
-                              <button
-                                onClick={() => toggleGlobalItem(item.id)}
-                                disabled={!!saving}
-                                title={item.is_global_active ? "Скрыть" : "Включить"}
-                                className={cn(
-                                  "w-7 h-7 rounded-lg border transition-all flex items-center justify-center mx-auto",
-                                  isSaving && "opacity-50 cursor-wait",
-                                  item.is_global_active
-                                    ? "bg-brand-50 border-brand-200 hover:bg-brand-100"
-                                    : "bg-neutral-100 border-neutral-300 hover:bg-neutral-200"
-                                )}>
-                                {isSaving
-                                  ? <Loader2 size={12} className="animate-spin text-neutral-400" />
-                                  : item.is_global_active
-                                  ? <Check size={12} className="text-brand-500" />
-                                  : <X size={12} className="text-neutral-400" />}
-                              </button>
-                            </td>
-                            <td className="px-3 py-2 text-center">
-                              {item.is_global_active && (
-                                isEditing ? (
-                                  <div className="flex gap-1 items-center justify-center">
-                                    <input autoFocus value={priceInput}
-                                      onChange={e => setPriceInput(e.target.value)}
-                                      onKeyDown={e => {
-                                        if (e.key === "Enter") { e.preventDefault(); saveGlobalPrice(item.id); }
-                                        if (e.key === "Escape") setEditing(null);
-                                      }}
-                                      onBlur={e => { if (!e.relatedTarget) setTimeout(() => setEditing(null), 150); }}
-                                      placeholder="0"
-                                      className="w-20 text-xs border rounded px-1.5 py-0.5 text-center focus:border-brand-500 outline-none" />
-                                    <button onMouseDown={e => e.preventDefault()} onClick={() => saveGlobalPrice(item.id)} className="text-success-500 hover:text-success-600"><Check size={12} /></button>
-                                  </div>
-                                ) : (
-                                  <button
-                                    onClick={() => { setEditing({ itemId: item.id, cityId: "global" }); setPriceInput(hasPrice ? String(item.global_price) : ""); }}
-                                    className="text-xs text-neutral-400 hover:text-brand-500 flex items-center gap-0.5 mx-auto">
-                                    {hasPrice
-                                      ? <span className="text-success-600 font-medium num">{item.global_price} ₽</span>
-                                      : <span>+ цена</span>}
-                                    <Edit3 size={9} />
-                                  </button>
-                                )
-                              )}
+                              <div className="flex flex-col items-center gap-1">
+                                <button
+                                  onClick={() => toggleGlobalItem(item.id)}
+                                  disabled={!!saving}
+                                  title={item.is_global_active ? "Скрыть" : "Включить"}
+                                  className={cn(
+                                    "w-7 h-7 rounded-lg border transition-all flex items-center justify-center",
+                                    isSaving && "opacity-50 cursor-wait",
+                                    item.is_global_active
+                                      ? (hasPrice ? "bg-success-50 border-success-200 hover:bg-success-100" : "bg-brand-50 border-brand-200 hover:bg-brand-100")
+                                      : "bg-neutral-100 border-neutral-300 hover:bg-neutral-200"
+                                  )}>
+                                  {isSaving
+                                    ? <Loader2 size={12} className="animate-spin text-neutral-400" />
+                                    : item.is_global_active
+                                    ? <Check size={12} className={hasPrice ? "text-success-500" : "text-brand-500"} />
+                                    : <X size={12} className="text-neutral-400" />}
+                                </button>
+                                {item.is_global_active && (
+                                  isEditing ? (
+                                    <div className="flex gap-1 items-center">
+                                      <input autoFocus value={priceInput}
+                                        onChange={e => setPriceInput(e.target.value)}
+                                        onKeyDown={e => {
+                                          if (e.key === "Enter") { e.preventDefault(); saveGlobalPrice(item.id); }
+                                          if (e.key === "Escape") setEditing(null);
+                                        }}
+                                        onBlur={e => { if (!e.relatedTarget) setTimeout(() => setEditing(null), 150); }}
+                                        placeholder="0"
+                                        className="w-20 text-xs border rounded px-1.5 py-0.5 text-center focus:border-brand-500 outline-none" />
+                                      <button onMouseDown={e => e.preventDefault()} onClick={() => saveGlobalPrice(item.id)} className="text-success-500 hover:text-success-600"><Check size={12} /></button>
+                                    </div>
+                                  ) : (
+                                    <button
+                                      onClick={() => { setEditing({ itemId: item.id, cityId: "global" }); setPriceInput(hasPrice ? String(item.global_price) : ""); }}
+                                      className="text-xs text-neutral-400 hover:text-brand-500 flex items-center gap-0.5">
+                                      {hasPrice
+                                        ? <span className="text-success-600 font-medium num">{item.global_price} ₽</span>
+                                        : <span>+ цена</span>}
+                                      <Edit3 size={9} />
+                                    </button>
+                                  )
+                                )}
+                              </div>
                             </td>
                           </tr>
                         );
