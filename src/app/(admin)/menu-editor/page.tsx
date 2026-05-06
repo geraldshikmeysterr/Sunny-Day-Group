@@ -14,7 +14,7 @@ import {
   Plus, GripVertical, Edit2, Trash2, Eye, EyeOff,
   X, Loader2, Check, ImageIcon,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, getTypeName } from "@/lib/utils";
 import { validateImageFile } from "@/lib/validateImageFile";
 import { toast } from "sonner";
 
@@ -35,8 +35,6 @@ const EMPTY_FORM = {
   active_from: "10:00", active_until: "20:00", box_quantity: "", global_price: "",
 };
 
-const getTypeName = (name: string) =>
-  name === "Мороженое / Замороженные" ? "Замороженная продукция" : name;
 
 async function compressImage(file: File): Promise<File> {
   const bitmap = await createImageBitmap(file);

@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Check, X, Loader2, Search } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, getTypeName } from "@/lib/utils";
 import { toast } from "sonner";
 
 const DAYS = [
@@ -19,8 +19,6 @@ type MenuType = { id: string; slug: string; name: string };
 type Category = { id: string; name: string; menu_type_id: string; sort_order: number };
 type Item = { id: string; name: string; category_id: string; menu_type_id: string; weight_grams: number | null; active_days: number[] | null };
 
-const getTypeName = (name: string) =>
-  name === "Мороженое / Замороженные" ? "Замороженная продукция" : name;
 
 export default function MenuSchedulePage() {
   const supabase = createClient();

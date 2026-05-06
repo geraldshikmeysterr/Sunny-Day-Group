@@ -5,20 +5,6 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatPrice(kopecks: number): string {
-  return new Intl.NumberFormat("ru-RU", {
-    style: "currency", currency: "RUB", minimumFractionDigits: 0,
-  }).format(kopecks / 100);
-}
-
-export function rublesToKopecks(rubles: number): number {
-  return Math.round(rubles * 100);
-}
-
-export function kopecksToRubles(kopecks: number): number {
-  return kopecks / 100;
-}
-
 export function formatDate(date: string): string {
   return new Date(date).toLocaleDateString("ru-RU", {
     day: "2-digit", month: "2-digit", year: "numeric",
@@ -32,7 +18,10 @@ export function formatDateTime(date: string): string {
 }
 
 export type OrderStatus = "new" | "confirmed" | "preparing" | "delivering" | "delivered" | "cancelled";
-export type AdminRole = "superadmin" | "operator";
+
+export function getTypeName(name: string): string {
+  return name === "Мороженое / Замороженные" ? "Замороженная продукция" : name;
+}
 
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   new:        "Новый",

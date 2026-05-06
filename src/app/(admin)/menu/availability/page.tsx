@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useAdmin } from "@/components/layout/AdminContext";
 import { Check, X, Edit3, Loader2, ChevronDown, Search } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, getTypeName } from "@/lib/utils";
 import { toast } from "sonner";
 
 type City     = { id: string; name: string; city_menu_types?: { menu_type_id: string; is_available: boolean }[] };
@@ -52,8 +52,6 @@ function FilterDropdown({ label, options, selected, onToggle, onSelectAll, onCle
   );
 }
 
-const getTypeName = (name: string) =>
-  name === "Мороженое / Замороженные" ? "Замороженная продукция" : name;
 
 export default function AvailabilityPage() {
   const { isAdmin, cityIds: opCityIds, loaded } = useAdmin() as any;
