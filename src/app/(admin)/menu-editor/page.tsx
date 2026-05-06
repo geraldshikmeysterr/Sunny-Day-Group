@@ -26,13 +26,12 @@ type MenuItem = {
   proteins: number | null; fats: number | null; carbs: number | null;
   image_url: string | null; is_global_active: boolean; sort_order: number;
   active_from: string | null; active_until: string | null;
-  global_price: number | null;
 };
 
 const EMPTY_FORM = {
   name: "", description: "", weight_grams: "",
   calories: "", proteins: "", fats: "", carbs: "", image_url: "", is_global_active: false,
-  active_from: "10:00", active_until: "20:00", global_price: "",
+  active_from: "10:00", active_until: "20:00",
 };
 
 
@@ -330,7 +329,6 @@ export default function MenuEditorPage() {
       carbs: String(item.carbs ?? ""), image_url: item.image_url ?? "",
       is_global_active: item.is_global_active,
       active_from: item.active_from ?? "", active_until: item.active_until ?? "",
-      global_price: item.global_price != null ? String(item.global_price) : "",
     });
     setPhotoPreview(item.image_url); setPhotoFile(null);
     setModal({ open: true, item, catId: item.category_id });
@@ -357,7 +355,6 @@ export default function MenuEditorPage() {
     const activeMenuType = menuTypes.find(t => t.id === activeCat?.menu_type_id);
     const isGlobalType = activeMenuType?.is_global ?? false;
 
-    const globalPriceVal = form.global_price ? Number.parseFloat(form.global_price) : null;
     const payload = {
       name: form.name, description: form.description || null,
       weight_grams: form.weight_grams ? Number.parseInt(form.weight_grams) : null,
@@ -369,7 +366,6 @@ export default function MenuEditorPage() {
       category_id: modal.catId,
       active_from: form.active_from || null,
       active_until: form.active_until || null,
-      global_price: isGlobalType ? (globalPriceVal != null && globalPriceVal >= 0 ? globalPriceVal : null) : null,
     };
     if (modal.item) {
       await supabase.from("menu_items").update(payload).eq("id", modal.item.id);
@@ -536,27 +532,9 @@ export default function MenuEditorPage() {
                 const activeCat = categories.find(c => c.id === modal.catId);
                 const activeMenuType = menuTypes.find(t => t.id === activeCat?.menu_type_id);
                 return activeMenuType?.is_global ? (
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label htmlFor="item-global-price" className="label">Глобальная цена (руб.)</label>
-                      <div className="relative">
-                        <input
-                          id="item-global-price"
-                          type="number"
-                          min={0}
-                          value={form.global_price}
-                          onChange={e => setForm(p => ({ ...p, global_price: e.target.value }))}
-                          className="input pr-8"
-                          placeholder="0"
-                          style={{ appearance: "textfield", MozAppearance: "textfield" }}
-                        />
-                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 text-sm pointer-events-none">₽</span>
-                      </div>
-                    </div>
-                    <div>
-                      <label htmlFor="item-weight" className="label">Вес (г)</label>
-                      <input id="item-weight" type="number" placeholder="Вес блюда" value={form.weight_grams} onChange={e => setForm(p => ({ ...p, weight_grams: e.target.value }))} className="input" />
-                    </div>
+                  <div>
+                    <label htmlFor="item-weight" className="label">Вес (г)</label>
+                    <input id="item-weight" type="number" placeholder="Вес блюда" value={form.weight_grams} onChange={e => setForm(p => ({ ...p, weight_grams: e.target.value }))} className="input" />
                   </div>
                 ) : (
                   <>
