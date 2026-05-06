@@ -33,7 +33,7 @@ export default function ActiveOrdersPage() {
     setLoading(true);
     try {
       let q = supabase.from("orders")
-        .select("id,status,menu_type,total_amount,delivery_fee,comment,created_at,payment_status,profiles(phone,first_name),addresses(full_address,street,house,apartment),order_items(item_name,quantity,item_price),cities(name)", { count: "exact" })
+        .select("id,status,menu_type,total_amount,delivery_fee,discount_amount,promocode_code,comment,created_at,payment_status,profiles(phone,first_name),addresses(full_address,street,house,apartment),order_items(item_name,quantity,item_price),cities(name)", { count: "exact" })
         .in("status", ACTIVE)
         .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
         .order("created_at", { ascending: false });
@@ -106,9 +106,9 @@ export default function ActiveOrdersPage() {
       <div className="card overflow-hidden">
         <div className="table-wrapper rounded-none border-0">
           <table className="table">
-            <thead><tr><th>Заказ</th><th>Клиент</th>{isAdmin && <th>Город</th>}<th>Тип</th><th>Адрес</th><th>Состав</th><th>Комментарий</th><th>Сумма</th><th>Статус</th><th>Дата</th><th></th></tr></thead>
+            <thead><tr><th>Заказ</th><th>Клиент</th>{isAdmin && <th>Город</th>}<th>Тип</th><th>Адрес</th><th>Состав</th><th>Комментарий</th><th>Промокод</th><th>Сумма</th><th>Статус</th><th>Дата</th><th></th></tr></thead>
             <tbody>
-              {loading && Array.from({length:5},(_,i)=>i).map(i=><tr key={`sk-${i}`}>{Array.from({length:isAdmin?11:10},(_,j)=>j).map(j=><td key={`sk-col-${j}`}><div className="skeleton h-4 w-full"/></td>)}</tr>)}
+              {loading && Array.from({length:5},(_,i)=>i).map(i=><tr key={`sk-${i}`}>{Array.from({length:isAdmin?12:11},(_,j)=>j).map(j=><td key={`sk-col-${j}`}><div className="skeleton h-4 w-full"/></td>)}</tr>)}
               {!loading && orders.map(order => {
                 const c = ORDER_STATUS_COLORS[order.status as OrderStatus];
                 const nextStatus = ALLOWED_TRANSITIONS[order.status as OrderStatus].find(s => s !== "cancelled");
@@ -127,6 +127,7 @@ export default function ActiveOrdersPage() {
                     <td className="text-xs text-neutral-600 whitespace-normal min-w-[180px]">{addr||"—"}</td>
                     <td className="text-xs text-neutral-500 whitespace-normal min-w-[200px]">{items||"—"}</td>
                     <td className="text-xs text-brand-500 italic whitespace-normal min-w-[140px]">{order.comment||"—"}</td>
+                    <td className="w-px whitespace-nowrap">{order.promocode_code?<><p className="text-xs font-mono font-semibold text-neutral-700">{order.promocode_code}</p><p className="text-xs text-success-600">−{Number(order.discount_amount??0).toLocaleString("ru-RU")} ₽</p></>:<span className="text-neutral-300">—</span>}</td>
                     <td className="w-px whitespace-nowrap num"><p className="font-semibold">{Number(order.total_amount??0).toLocaleString("ru-RU")} ₽</p>{order.delivery_fee>0&&<p className="text-xs text-neutral-400">+{Number(order.delivery_fee).toLocaleString("ru-RU")} ₽</p>}</td>
                     <td className="w-px whitespace-nowrap"><span className={`badge ${c.bg} ${c.text}`}><span className={`w-1.5 h-1.5 rounded-full ${c.dot}`}/>{ORDER_STATUS_LABELS[order.status as OrderStatus]}</span></td>
                     <td className="w-px whitespace-nowrap text-xs text-neutral-400 num">{formatDateTime(order.created_at)}</td>
@@ -134,7 +135,7 @@ export default function ActiveOrdersPage() {
                   </tr>
                 );
               })}
-              {!loading&&!orders.length&&<tr><td colSpan={isAdmin?11:10} className="py-16 text-center text-neutral-400">Нет активных заказов</td></tr>}
+              {!loading&&!orders.length&&<tr><td colSpan={isAdmin?12:11} className="py-16 text-center text-neutral-400">Нет активных заказов</td></tr>}
             </tbody>
           </table>
         </div>
