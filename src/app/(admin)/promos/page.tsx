@@ -246,77 +246,56 @@ export default function PromosPage() {
               <button onClick={()=>setModal(false)} className="btn-ghost btn-sm"><X size={16}/></button>
             </div>
             <div className="overflow-y-auto flex-1 p-6 space-y-4">
-              {/* Код + Город */}
+
+              {/* ── Общее ──────────────────────────────────────────────── */}
+              <div className="flex items-center gap-3"><span className="text-xs font-semibold text-neutral-400 uppercase tracking-wider whitespace-nowrap">Общее</span><div className="flex-1 h-px bg-neutral-200"/></div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div><label htmlFor="promo-code" className="label">Код *</label><input id="promo-code" value={form.code} onChange={e=>setForm((p:any)=>({...p,code:e.target.value.toUpperCase().replaceAll(/[^A-Z0-9_-]/g,"")}))} className="input font-mono" placeholder="SUNNY20" maxLength={50} autoComplete="off"/></div>
-                <div><p className="label">Город</p><CustomSelect value={form.city_id} onChange={v=>setForm((p:any)=>({...p,city_id:v}))} options={cityOptions}/></div>
-              </div>
-
-              {/* Описание */}
-              <div><label htmlFor="promo-desc" className="label">Описание</label><textarea id="promo-desc" value={form.description} onChange={e=>setForm((p:any)=>({...p,description:e.target.value}))} rows={3} className="textarea w-full" placeholder="Описание промокода"/></div>
-
-              {/* Тип скидки + (Размер ИЛИ Тип меню для free_delivery) */}
-              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <p className="label">Тип скидки *</p>
+                  <p className="label">Тип промокода *</p>
                   <CustomSelect value={form.promo_type} onChange={v=>setForm((p:any)=>({...p,promo_type:v,buy_quantity:"",get_quantity:""}))} options={typeOptions}/>
                 </div>
-                {isFreeDelivery
-                  ? <div>
-                      <p className="label">Тип меню</p>
-                      <CustomSelect value={form.menu_type_scope} onChange={v=>setForm((p:any)=>({...p,menu_type_scope:v,city_id:""}))} options={MENU_TYPE_SCOPE_OPTIONS}/>
-                    </div>
-                  : !isBuyNGetM
-                    ? <div>
-                        <label htmlFor="promo-discount" className="label">{form.promo_type==="percent"?"Размер (%)":"Сумма (₽)"} *</label>
-                        <input id="promo-discount" type="number" value={form.discount_value} onChange={e=>setForm((p:any)=>({...p,discount_value:e.target.value}))} className="input" placeholder="0" autoComplete="off"/>
-                      </div>
-                    : <div>
-                        <p className="label">Тип меню</p>
-                        <CustomSelect value={form.menu_type_scope} onChange={v=>setForm((p:any)=>({...p,menu_type_scope:v,city_id:"",item_ids:[]}))} options={MENU_TYPE_SCOPE_OPTIONS}/>
-                      </div>
-                }
               </div>
 
-              {/* Поля «Купи / Получи» для типа buy_n_get_m */}
+              <div><label htmlFor="promo-desc" className="label">Описание</label><textarea id="promo-desc" value={form.description} onChange={e=>setForm((p:any)=>({...p,description:e.target.value}))} rows={2} className="textarea w-full" placeholder="Описание промокода"/></div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="label">Тип меню</p>
+                  <CustomSelect value={form.menu_type_scope} onChange={v=>setForm((p:any)=>({...p,menu_type_scope:v,city_id:"",item_ids:[],category_ids:[]}))} options={MENU_TYPE_SCOPE_OPTIONS}/>
+                </div>
+                {form.menu_type_scope!=="frozen"&&(
+                  <div><p className="label">Город</p><CustomSelect value={form.city_id} onChange={v=>setForm((p:any)=>({...p,city_id:v}))} options={cityOptions}/></div>
+                )}
+              </div>
+
+              {/* ── Условия скидки ─────────────────────────────────────── */}
+              <div className="flex items-center gap-3"><span className="text-xs font-semibold text-neutral-400 uppercase tracking-wider whitespace-nowrap">Условия скидки</span><div className="flex-1 h-px bg-neutral-200"/></div>
+
               {isBuyNGetM&&(
                 <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label htmlFor="promo-buy-qty" className="label">Купи (N) *</label>
-                    <input id="promo-buy-qty" type="number" min={1} value={form.buy_quantity} onChange={e=>setForm((p:any)=>({...p,buy_quantity:e.target.value}))} className="input" placeholder="2" autoComplete="off"/>
-                  </div>
-                  <div>
-                    <label htmlFor="promo-get-qty" className="label">Получи итого (M) *</label>
-                    <input id="promo-get-qty" type="number" min={2} value={form.get_quantity} onChange={e=>setForm((p:any)=>({...p,get_quantity:e.target.value}))} className="input" placeholder="3" autoComplete="off"/>
-                  </div>
+                  <div><label htmlFor="promo-buy-qty" className="label">Купи (N) *</label><input id="promo-buy-qty" type="number" min={1} value={form.buy_quantity} onChange={e=>setForm((p:any)=>({...p,buy_quantity:e.target.value}))} className="input" placeholder="2" autoComplete="off"/></div>
+                  <div><label htmlFor="promo-get-qty" className="label">Получи итого (M) *</label><input id="promo-get-qty" type="number" min={2} value={form.get_quantity} onChange={e=>setForm((p:any)=>({...p,get_quantity:e.target.value}))} className="input" placeholder="3" autoComplete="off"/></div>
                 </div>
               )}
 
-              {/* Область применения + Тип меню (только для не-free_delivery и не-buy_n_get_m) */}
               {!isFreeDelivery&&!isBuyNGetM&&(
                 <div className="grid grid-cols-2 gap-3">
+                  <div><label htmlFor="promo-discount" className="label">{form.promo_type==="percent"?"Размер (%) *":"Сумма (₽) *"}</label><input id="promo-discount" type="number" value={form.discount_value} onChange={e=>setForm((p:any)=>({...p,discount_value:e.target.value}))} className="input" placeholder="0" autoComplete="off"/></div>
                   <div>
                     <p className="label">Область применения</p>
                     <CustomSelect value={form.promo_scope} onChange={v=>setForm((p:any)=>({...p,promo_scope:v}))} options={scopeOptions}/>
                   </div>
-                  <div>
-                    <p className="label">Тип меню</p>
-                    <CustomSelect value={form.menu_type_scope} onChange={v=>setForm((p:any)=>({...p,menu_type_scope:v,city_id:"",item_ids:[],category_ids:[]}))} options={MENU_TYPE_SCOPE_OPTIONS}/>
-                  </div>
                 </div>
               )}
 
-              {/* Блюда — для buy_n_get_m и для обычного item scope */}
               {(isBuyNGetM||(!isFreeDelivery&&!isBuyNGetM&&form.promo_scope==="item"))&&(
                 <div><p className="label">Блюда</p>
-                  <div className="border border-neutral-200 rounded-lg p-2 max-h-40 overflow-y-auto space-y-0.5">
+                  <div className="border border-neutral-200 rounded-lg p-2 max-h-36 overflow-y-auto space-y-0.5">
                     {filteredMenuItems.map((item:any)=>(
-                      <button key={item.id} type="button"
-                        onClick={()=>setForm((p:any)=>({...p,item_ids:p.item_ids.includes(item.id)?p.item_ids.filter((id:string)=>id!==item.id):[...p.item_ids,item.id]}))}
-                        className="flex items-center gap-2.5 w-full px-2 py-1.5 text-sm text-left hover:bg-neutral-50 rounded transition-colors">
-                        <div className={cn("w-4 h-4 rounded border flex items-center justify-center shrink-0",form.item_ids.includes(item.id)?"bg-brand-500 border-brand-500":"border-neutral-300")}>
-                          {form.item_ids.includes(item.id)&&<Check size={10} className="text-white"/>}
-                        </div>
+                      <button key={item.id} type="button" onClick={()=>setForm((p:any)=>({...p,item_ids:p.item_ids.includes(item.id)?p.item_ids.filter((id:string)=>id!==item.id):[...p.item_ids,item.id]}))} className="flex items-center gap-2.5 w-full px-2 py-1.5 text-sm text-left hover:bg-neutral-50 rounded transition-colors">
+                        <div className={cn("w-4 h-4 rounded border flex items-center justify-center shrink-0",form.item_ids.includes(item.id)?"bg-brand-500 border-brand-500":"border-neutral-300")}>{form.item_ids.includes(item.id)&&<Check size={10} className="text-white"/>}</div>
                         <span className="truncate">{item.name}</span>
                       </button>
                     ))}
@@ -325,14 +304,10 @@ export default function PromosPage() {
               )}
               {!isFreeDelivery&&!isBuyNGetM&&form.promo_scope==="category"&&(
                 <div><p className="label">Категории</p>
-                  <div className="border border-neutral-200 rounded-lg p-2 max-h-40 overflow-y-auto space-y-0.5">
+                  <div className="border border-neutral-200 rounded-lg p-2 max-h-36 overflow-y-auto space-y-0.5">
                     {filteredCategories.map((cat:any)=>(
-                      <button key={cat.id} type="button"
-                        onClick={()=>setForm((p:any)=>({...p,category_ids:p.category_ids.includes(cat.id)?p.category_ids.filter((id:string)=>id!==cat.id):[...p.category_ids,cat.id]}))}
-                        className="flex items-center gap-2.5 w-full px-2 py-1.5 text-sm text-left hover:bg-neutral-50 rounded transition-colors">
-                        <div className={cn("w-4 h-4 rounded border flex items-center justify-center shrink-0",form.category_ids.includes(cat.id)?"bg-brand-500 border-brand-500":"border-neutral-300")}>
-                          {form.category_ids.includes(cat.id)&&<Check size={10} className="text-white"/>}
-                        </div>
+                      <button key={cat.id} type="button" onClick={()=>setForm((p:any)=>({...p,category_ids:p.category_ids.includes(cat.id)?p.category_ids.filter((id:string)=>id!==cat.id):[...p.category_ids,cat.id]}))} className="flex items-center gap-2.5 w-full px-2 py-1.5 text-sm text-left hover:bg-neutral-50 rounded transition-colors">
+                        <div className={cn("w-4 h-4 rounded border flex items-center justify-center shrink-0",form.category_ids.includes(cat.id)?"bg-brand-500 border-brand-500":"border-neutral-300")}>{form.category_ids.includes(cat.id)&&<Check size={10} className="text-white"/>}</div>
                         <span className="truncate">{cat.name}</span>
                       </button>
                     ))}
@@ -340,13 +315,19 @@ export default function PromosPage() {
                 </div>
               )}
 
-              {/* Дополнительные параметры */}
               <div className="grid grid-cols-2 gap-3">
                 <div><label htmlFor="promo-min" className="label">Мин. сумма (₽)</label><input id="promo-min" type="number" value={form.min_order_amount} onChange={e=>setForm((p:any)=>({...p,min_order_amount:e.target.value}))} className="input" placeholder="0" autoComplete="off"/></div>
                 <div><label htmlFor="promo-max-uses" className="label">Макс. использований</label><input id="promo-max-uses" type="number" value={form.max_uses} onChange={e=>setForm((p:any)=>({...p,max_uses:e.target.value}))} className="input" placeholder="∞" autoComplete="off"/></div>
+              </div>
+
+              {/* ── Период действия ────────────────────────────────────── */}
+              <div className="flex items-center gap-3"><span className="text-xs font-semibold text-neutral-400 uppercase tracking-wider whitespace-nowrap">Период действия</span><div className="flex-1 h-px bg-neutral-200"/></div>
+
+              <div className="grid grid-cols-2 gap-3">
                 <div><label htmlFor="promo-from" className="label">Действует с</label><input id="promo-from" type="datetime-local" value={form.valid_from} onChange={e=>setForm((p:any)=>({...p,valid_from:e.target.value}))} className="input"/></div>
                 <div><label htmlFor="promo-until" className="label">Действует до</label><input id="promo-until" type="datetime-local" value={form.valid_until} onChange={e=>setForm((p:any)=>({...p,valid_until:e.target.value}))} className="input"/></div>
               </div>
+
               <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={form.is_active} onChange={e=>setForm((p:any)=>({...p,is_active:e.target.checked}))} className="w-4 h-4 rounded accent-brand-500"/> Активен</label>
             </div>
             <div className="flex justify-end gap-2 px-6 py-4 border-t border-neutral-200">
