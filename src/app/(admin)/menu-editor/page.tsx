@@ -12,14 +12,14 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import {
   Plus, GripVertical, Edit2, Trash2, Eye, EyeOff,
-  X, Loader2, Check, ImageIcon,
+  X, Loader2, Check, ImageIcon, Clock,
 } from "lucide-react";
 import { cn, getTypeName } from "@/lib/utils";
 import { validateImageFile } from "@/lib/validateImageFile";
 import { toast } from "sonner";
 
 type MenuType = { id: string; slug: string; name: string; is_global: boolean };
-type Category = { id: string; name: string; menu_type_id: string; sort_order: number; is_active: boolean };
+type Category = { id: string; name: string; menu_type_id: string; sort_order: number; is_active: boolean; hide_when_schedule_expired: boolean };
 type MenuItem = {
   id: string; category_id: string; name: string; description: string | null;
   weight_grams: number | null; calories: number | null;
@@ -95,9 +95,10 @@ function SortableItemRow({ item, onEdit, onDelete, onToggle }: Readonly<{
   );
 }
 
-function SortableCategoryBlock({ cat, items, onEditCatName, onToggleCat, onDeleteCat, onAddItem, onEditItem, onDeleteItem, onToggleItem, deletingCat }: Readonly<{
+function SortableCategoryBlock({ cat, items, onEditCatName, onToggleCat, onToggleCatSchedule, onDeleteCat, onAddItem, onEditItem, onDeleteItem, onToggleItem, deletingCat }: Readonly<{
   cat: Category; items: MenuItem[];
   onEditCatName: (c: Category) => void; onToggleCat: (c: Category) => void;
+  onToggleCatSchedule: (c: Category) => void;
   onDeleteCat: (c: Category) => void; onAddItem: (catId: string) => void;
   onEditItem: (i: MenuItem) => void; onDeleteItem: (id: string) => void;
   onToggleItem: (i: MenuItem) => void; deletingCat: string | null;
@@ -153,6 +154,12 @@ function SortableCategoryBlock({ cat, items, onEditCatName, onToggleCat, onDelet
         )}
 
         <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button
+            onClick={() => onToggleCatSchedule(cat)}
+            title={cat.hide_when_schedule_expired ? "Категория скрывается по расписанию" : "Категория всегда видна"}
+            className={cn("btn-ghost btn-sm", cat.hide_when_schedule_expired ? "text-brand-500" : "text-neutral-400")}>
+            <Clock size={13} />
+          </button>
           <button onClick={() => setEditingName(true)} className="btn-ghost btn-sm text-brand-500"><Edit2 size={13} /></button>
           <button onClick={() => onToggleCat(cat)} className={cn("btn-ghost btn-sm", cat.is_active ? "text-success-500" : "text-neutral-400")}>
             {cat.is_active ? <Eye size={14} /> : <EyeOff size={14} />}
@@ -288,6 +295,12 @@ export default function MenuEditorPage() {
   async function toggleCat(cat: Category) {
     await supabase.from("categories").update({ is_active: !cat.is_active }).eq("id", cat.id);
     setCategories(p => p.map(c => c.id === cat.id ? { ...c, is_active: !c.is_active } : c));
+  }
+
+  async function toggleCatSchedule(cat: Category) {
+    const next = !cat.hide_when_schedule_expired;
+    await supabase.from("categories").update({ hide_when_schedule_expired: next }).eq("id", cat.id);
+    setCategories(p => p.map(c => c.id === cat.id ? { ...c, hide_when_schedule_expired: next } : c));
   }
 
   async function deleteCat(cat: Category) {
@@ -450,6 +463,7 @@ export default function MenuEditorPage() {
                 <SortableCategoryBlock
                   key={cat.id} cat={cat} items={catItems}
                   onEditCatName={updateCatName} onToggleCat={toggleCat}
+                  onToggleCatSchedule={toggleCatSchedule}
                   onDeleteCat={deleteCat} onAddItem={openAdd}
                   onEditItem={openEdit} onDeleteItem={deleteItem}
                   onToggleItem={toggleItem} deletingCat={deletingCat}
