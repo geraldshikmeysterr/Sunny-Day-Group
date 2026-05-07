@@ -30,7 +30,7 @@ export default function CompletedOrdersPage() {
     setLoading(true);
     try {
       let q = supabase.from("orders")
-        .select("id,status,total_amount,delivery_fee,discount_amount,promocode_code,created_at,payment_status,comment,profiles(phone,first_name),addresses(full_address,street,house),order_items(item_name,quantity),cities(name)", { count: "exact" })
+        .select("id,status,total_amount,delivery_fee,discount_amount,promocode_code,created_at,comment,profiles(phone,first_name),addresses(full_address,street,house),order_items(item_name,quantity),cities(name)", { count: "exact" })
         .in("status", ["delivered","cancelled"])
         .range(page*PAGE_SIZE,(page+1)*PAGE_SIZE-1)
         .order("created_at",{ascending:false});
@@ -68,15 +68,11 @@ export default function CompletedOrdersPage() {
       <div className="card overflow-hidden">
         <div className="table-wrapper rounded-none border-0">
           <table className="table">
-            <thead><tr><th>Заказ</th><th>Клиент</th>{isAdmin&&<th>Город</th>}<th>Адрес</th><th>Состав</th><th>Комментарий</th><th>Промокод</th><th>Сумма</th><th>Статус</th><th>Оплата</th><th>Дата</th></tr></thead>
+            <thead><tr><th>Заказ</th><th>Клиент</th>{isAdmin&&<th>Город</th>}<th>Адрес</th><th>Состав</th><th>Комментарий</th><th>Промокод</th><th>Сумма</th><th>Статус</th><th>Дата</th></tr></thead>
             <tbody>
               {loading&&Array.from({length:6},(_,i)=>i).map(i=><tr key={`sk-${i}`}>{Array.from({length:isAdmin?11:10},(_,j)=>j).map(j=><td key={`sk-col-${j}`}><div className="skeleton h-4"/></td>)}</tr>)}
               {!loading&&orders.map(order=>{
                 const c=ORDER_STATUS_COLORS[order.status as OrderStatus];
-                let paymentLabel = "—";
-                if (order.payment_status === "paid") paymentLabel = "Оплачен";
-                else if (order.payment_status === "refunded") paymentLabel = "Возврат";
-                const paymentClass = order.payment_status === "paid" ? "bg-success-50 text-success-700" : "bg-neutral-100 text-neutral-500";
                 return(<tr key={order.id}>
                   <td className="w-px whitespace-nowrap font-mono text-xs font-bold">#{order.id.slice(0,8).toUpperCase()}</td>
                   <td className="w-px whitespace-nowrap"><p className="font-medium text-sm">{order.profiles?.phone??"—"}</p>{order.profiles?.first_name&&<p className="text-xs text-neutral-400">{order.profiles.first_name}</p>}</td>
@@ -87,11 +83,10 @@ export default function CompletedOrdersPage() {
                   <td className="w-px whitespace-nowrap">{order.promocode_code?<><p className="text-xs font-mono font-semibold text-neutral-700">{order.promocode_code}</p><p className="text-xs text-success-600">−{Number(order.discount_amount??0).toLocaleString("ru-RU")} ₽</p></>:<span className="text-neutral-300">—</span>}</td>
                   <td className="w-px whitespace-nowrap num font-semibold">{Number(order.total_amount??0).toLocaleString("ru-RU")} ₽</td>
                   <td className="w-px whitespace-nowrap"><span className={`badge ${c.bg} ${c.text}`}><span className={`w-1.5 h-1.5 rounded-full ${c.dot}`}/>{ORDER_STATUS_LABELS[order.status as OrderStatus]}</span></td>
-                  <td className="w-px whitespace-nowrap"><span className={`badge text-xs ${paymentClass}`}>{paymentLabel}</span></td>
                   <td className="w-px whitespace-nowrap text-xs text-neutral-400 num">{formatDateTime(order.created_at)}</td>
                 </tr>);
               })}
-              {!loading&&!orders.length&&<tr><td colSpan={isAdmin?11:10} className="py-16 text-center text-neutral-400">Нет завершённых заказов</td></tr>}
+              {!loading&&!orders.length&&<tr><td colSpan={isAdmin?10:9} className="py-16 text-center text-neutral-400">Нет завершённых заказов</td></tr>}
             </tbody>
           </table>
         </div>

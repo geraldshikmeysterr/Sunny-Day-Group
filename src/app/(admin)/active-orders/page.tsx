@@ -35,6 +35,7 @@ export default function ActiveOrdersPage() {
       let q = supabase.from("orders")
         .select("id,status,menu_type,total_amount,delivery_fee,discount_amount,promocode_code,comment,created_at,payment_status,profiles(phone,first_name),addresses(full_address,street,house,apartment),order_items(item_name,quantity,item_price),cities(name)", { count: "exact" })
         .in("status", ACTIVE)
+        .eq("payment_status", "paid")
         .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
         .order("created_at", { ascending: false });
       if (!isAdmin) {
