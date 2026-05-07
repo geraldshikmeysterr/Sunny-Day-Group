@@ -42,15 +42,8 @@ async function isMfaComplete(supabase: any, user: any): Promise<boolean> {
     (f: any) => f.factor_type === "totp" && f.status === "verified"
   );
   if (!hasVerifiedTotp) return true;
-  const { data: { session } } = await supabase.auth.getSession();
-  try {
-    const payload = JSON.parse(
-      Buffer.from(session!.access_token.split(".")[1], "base64").toString()
-    );
-    return (payload.amr ?? []).some((m: any) => m.method === "totp");
-  } catch {
-    return false;
-  }
+  const { data } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  return data?.currentLevel === "aal2";
 }
 
 function isAdminOnlyPath(path: string): boolean {

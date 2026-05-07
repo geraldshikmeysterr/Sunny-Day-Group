@@ -5,9 +5,10 @@ import { Plus, Trash2, X, Loader2, Eye, EyeOff, Edit2, Phone, Mail, MessageCircl
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import ZonesPanel, { type FullZone } from "@/components/ZonesPanel";
+import { CustomSelect } from "@/components/CustomSelect";
 
 type City = {
-  id: string; name: string; is_active: boolean;
+  id: string; name: string; is_active: boolean; timezone: string;
   phone: string | null; email: string | null;
   telegram: string | null; instagram: string | null; vk: string | null; max_messenger: string | null;
 };
@@ -15,12 +16,28 @@ type City = {
 type CityFields = {
   name: string; phone: string; email: string;
   telegram: string; instagram: string; vk: string; max: string;
-  is_active: boolean;
+  is_active: boolean; timezone: string;
 };
+
+const RUSSIAN_TIMEZONES = [
+  { value: "Europe/Kaliningrad",  label: "Калининград (UTC+2)"  },
+  { value: "Europe/Moscow",       label: "Москва (UTC+3)"       },
+  { value: "Europe/Samara",       label: "Самара (UTC+4)"       },
+  { value: "Asia/Yekaterinburg",  label: "Екатеринбург (UTC+5)" },
+  { value: "Asia/Omsk",           label: "Омск (UTC+6)"         },
+  { value: "Asia/Novosibirsk",    label: "Новосибирск (UTC+7)"  },
+  { value: "Asia/Barnaul",        label: "Барнаул (UTC+7)"      },
+  { value: "Asia/Krasnoyarsk",    label: "Красноярск (UTC+7)"   },
+  { value: "Asia/Irkutsk",        label: "Иркутск (UTC+8)"      },
+  { value: "Asia/Yakutsk",        label: "Якутск (UTC+9)"       },
+  { value: "Asia/Vladivostok",    label: "Владивосток (UTC+10)" },
+  { value: "Asia/Magadan",        label: "Магадан (UTC+11)"     },
+  { value: "Asia/Kamchatka",      label: "Камчатка (UTC+12)"    },
+];
 
 const EMPTY: CityFields = {
   name: "", phone: "", email: "", telegram: "", instagram: "", vk: "", max: "",
-  is_active: false,
+  is_active: false, timezone: "Europe/Moscow",
 };
 
 // ---------------------------------------------------------------------------
@@ -71,6 +88,14 @@ function CityFormFields({ values, onChange }: {
           <input value={values.name}
             onChange={e => onChange("name", e.target.value)}
             className="input" placeholder="Новосибирск" />
+        </div>
+        <div>
+          <label className="label">Часовой пояс</label>
+          <CustomSelect
+            value={values.timezone}
+            onChange={v => onChange("timezone", v)}
+            options={RUSSIAN_TIMEZONES}
+          />
         </div>
         <label className="flex items-center gap-2 text-sm cursor-pointer">
           <input type="checkbox" checked={values.is_active}
@@ -177,7 +202,7 @@ export default function CitiesPage() {
     setSaving(true); setError("");
     try {
       const { data: newCity, error: cityError } = await supabase
-        .from("cities").insert({ name: addForm.name, is_active: addForm.is_active })
+        .from("cities").insert({ name: addForm.name, is_active: addForm.is_active, timezone: addForm.timezone })
         .select().single();
       if (cityError) throw new Error(cityError.message);
 
@@ -227,7 +252,7 @@ export default function CitiesPage() {
     setSaving(true);
     try {
       const { error } = await supabase.from("cities").update({
-        name: editForm.name, is_active: editForm.is_active,
+        name: editForm.name, is_active: editForm.is_active, timezone: editForm.timezone,
         phone: editForm.phone || null, email: editForm.email || null,
         telegram: editForm.telegram || null, instagram: editForm.instagram || null,
         vk: editForm.vk || null, max_messenger: editForm.max || null,
@@ -266,7 +291,7 @@ export default function CitiesPage() {
 
   function openEdit(city: City) {
     setEditForm({
-      name: city.name, is_active: city.is_active,
+      name: city.name, is_active: city.is_active, timezone: city.timezone,
       phone: city.phone ?? "", email: city.email ?? "",
       telegram: city.telegram ?? "", instagram: city.instagram ?? "",
       vk: city.vk ?? "", max: city.max_messenger ?? "",
@@ -279,6 +304,7 @@ export default function CitiesPage() {
       const changed =
         editForm.name !== editModal.name ||
         editForm.is_active !== editModal.is_active ||
+        editForm.timezone !== editModal.timezone ||
         editForm.phone !== (editModal.phone ?? "") ||
         editForm.email !== (editModal.email ?? "") ||
         editForm.telegram !== (editModal.telegram ?? "") ||
